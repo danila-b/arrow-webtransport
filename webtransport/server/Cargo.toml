@@ -1,0 +1,10 @@
+[package]
+name = "server-webtransport"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wtransport = "0.1"
+tokio = { version = "1", features = ["full"] }
+arrow = "53"
+anyhow = "1"

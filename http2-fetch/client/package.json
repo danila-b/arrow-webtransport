@@ -1,0 +1,20 @@
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.4",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vite-plugin-mkcert": "^1.17.9"
+  },
+  "dependencies": {
+    "apache-arrow": "^21.1.0"
+  }
+}
