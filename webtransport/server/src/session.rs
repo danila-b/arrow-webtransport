@@ -2,9 +2,7 @@ use anyhow::Result;
 
 use crate::arrow;
 
-pub async fn handle_session(
-    incoming_session: wtransport::endpoint::IncomingSession,
-) -> Result<()> {
+pub async fn handle_session(incoming_session: wtransport::endpoint::IncomingSession) -> Result<()> {
     let session_request = incoming_session.await?;
     println!(
         "New session request from: {:?}",

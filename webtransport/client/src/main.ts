@@ -1,6 +1,6 @@
 import './style.css';
-import { collectChunks, concatBuffers, decodeArrowTable } from './decode.ts';
-import { createAppLayout, renderArrowTable, setStatus } from './render.ts';
+import { decodeBatchesFromStream } from './decode.ts';
+import { appendBatchRows, createAppLayout, initStreamingTable, setStatus, updateRowCount } from './render.ts';
 import { connect, loadCertHash, openQueryStream } from './transport.ts';
 
 const root = document.getElementById('app');
@@ -23,12 +23,33 @@ runButton.addEventListener('click', async () => {
     const reader = await openQueryStream(transport, queryInput.value);
 
     setStatus(statusEl, 'Receiving data...', 'info');
-    const chunks = await collectChunks(reader);
-    const buffer = concatBuffers(chunks);
-    const table = decodeArrowTable(buffer);
 
-    renderArrowTable(table, tableContainer);
-    setStatus(statusEl, `Done — ${table.numRows} rows received`, 'success');
+    const batches = decodeBatchesFromStream(reader);
+    const first = await batches.next();
+
+    if (first.done) {
+      setStatus(statusEl, 'Done — 0 rows received', 'success');
+      transport.close();
+      return;
+    }
+
+    const columnNames = first.value.schema.fields.map((f) => f.name);
+    const { tbody, rowCountEl } = initStreamingTable(tableContainer, first.value.schema);
+
+    let totalRows = 0;
+    appendBatchRows(tbody, first.value, columnNames);
+    totalRows += first.value.numRows;
+    updateRowCount(rowCountEl, totalRows);
+    setStatus(statusEl, `Receiving data... ${totalRows} rows`, 'info');
+
+    for await (const batch of batches) {
+      appendBatchRows(tbody, batch, columnNames);
+      totalRows += batch.numRows;
+      updateRowCount(rowCountEl, totalRows);
+      setStatus(statusEl, `Receiving data... ${totalRows} rows`, 'info');
+    }
+
+    setStatus(statusEl, `Done — ${totalRows} rows received`, 'success');
 
     transport.close();
   } catch (err) {

@@ -1,70 +1,83 @@
 import { makeTable, tableToIPC } from 'apache-arrow';
 import { describe, expect, it } from 'vitest';
-import { collectChunks, concatBuffers, decodeArrowTable } from '../decode.ts';
+import { decodeBatchesFromStream, streamChunks } from '../decode.ts';
 
-describe('concatBuffers', () => {
-  it('returns empty buffer for empty array', () => {
-    const result = concatBuffers([]);
-    expect(result).toBeInstanceOf(Uint8Array);
-    expect(result.length).toBe(0);
+function mockReader(chunks: Uint8Array[]): ReadableStreamDefaultReader<Uint8Array> {
+  let index = 0;
+  return {
+    read: async () => {
+      if (index < chunks.length) {
+        return { value: chunks[index++], done: false as const };
+      }
+      return { value: undefined, done: true as const };
+    },
+  } as ReadableStreamDefaultReader<Uint8Array>;
+}
+
+describe('streamChunks', () => {
+  it('yields each chunk from the reader', async () => {
+    const data = [new Uint8Array([1, 2]), new Uint8Array([3, 4, 5])];
+    const yielded: Uint8Array[] = [];
+
+    for await (const chunk of streamChunks(mockReader(data))) {
+      yielded.push(chunk);
+    }
+
+    expect(yielded).toHaveLength(2);
+    expect(Array.from(yielded[0])).toEqual([1, 2]);
+    expect(Array.from(yielded[1])).toEqual([3, 4, 5]);
   });
 
-  it('returns identical buffer for single chunk', () => {
-    const chunk = new Uint8Array([1, 2, 3]);
-    const result = concatBuffers([chunk]);
-    expect(Array.from(result)).toEqual([1, 2, 3]);
-  });
+  it('yields nothing for an empty reader', async () => {
+    const yielded: Uint8Array[] = [];
 
-  it('concatenates multiple chunks in order', () => {
-    const a = new Uint8Array([1, 2]);
-    const b = new Uint8Array([3, 4, 5]);
-    const c = new Uint8Array([6]);
-    const result = concatBuffers([a, b, c]);
-    expect(Array.from(result)).toEqual([1, 2, 3, 4, 5, 6]);
+    for await (const chunk of streamChunks(mockReader([]))) {
+      yielded.push(chunk);
+    }
+
+    expect(yielded).toHaveLength(0);
   });
 });
 
-describe('decodeArrowTable', () => {
-  it('round-trips a table through IPC encoding', () => {
-    const original = makeTable({
+describe('decodeBatchesFromStream', () => {
+  it('decodes Arrow IPC stream into RecordBatch objects', async () => {
+    const table = makeTable({
       id: Int32Array.from([1, 2, 3]),
       value: Float64Array.from([10.5, 20.5, 30.5]),
     });
 
-    const ipcBytes = tableToIPC(original, 'stream');
-    const decoded = decodeArrowTable(ipcBytes);
+    const ipcBytes = tableToIPC(table, 'stream');
+    const reader = mockReader([new Uint8Array(ipcBytes)]);
 
-    expect(decoded.numRows).toBe(3);
-    expect(decoded.schema.fields.map((f) => f.name)).toEqual(['id', 'value']);
-  });
-});
+    const batches = [];
+    for await (const batch of decodeBatchesFromStream(reader)) {
+      batches.push(batch);
+    }
 
-describe('collectChunks', () => {
-  it('collects all chunks from a reader', async () => {
-    const data = [new Uint8Array([1, 2]), new Uint8Array([3, 4])];
-    let index = 0;
-
-    const mockReader = {
-      read: async () => {
-        if (index < data.length) {
-          return { value: data[index++], done: false as const };
-        }
-        return { value: undefined, done: true as const };
-      },
-    } as ReadableStreamDefaultReader<Uint8Array>;
-
-    const chunks = await collectChunks(mockReader);
-    expect(chunks).toHaveLength(2);
-    expect(Array.from(chunks[0])).toEqual([1, 2]);
-    expect(Array.from(chunks[1])).toEqual([3, 4]);
+    expect(batches.length).toBeGreaterThanOrEqual(1);
+    expect(batches[0].schema.fields.map((f) => f.name)).toEqual(['id', 'value']);
+    const totalRows = batches.reduce((sum, b) => sum + b.numRows, 0);
+    expect(totalRows).toBe(3);
   });
 
-  it('returns empty array for reader with no data', async () => {
-    const mockReader = {
-      read: async () => ({ value: undefined, done: true as const }),
-    } as ReadableStreamDefaultReader<Uint8Array>;
+  it('handles IPC data split across multiple chunks', async () => {
+    const table = makeTable({
+      id: Int32Array.from([1, 2, 3, 4, 5]),
+    });
 
-    const chunks = await collectChunks(mockReader);
-    expect(chunks).toHaveLength(0);
+    const ipcBytes = new Uint8Array(tableToIPC(table, 'stream'));
+    const mid = Math.floor(ipcBytes.length / 2);
+    const chunk1 = ipcBytes.slice(0, mid);
+    const chunk2 = ipcBytes.slice(mid);
+
+    const reader = mockReader([chunk1, chunk2]);
+
+    const batches = [];
+    for await (const batch of decodeBatchesFromStream(reader)) {
+      batches.push(batch);
+    }
+
+    const totalRows = batches.reduce((sum, b) => sum + b.numRows, 0);
+    expect(totalRows).toBe(5);
   });
 });

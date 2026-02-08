@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use wtransport::tls::Sha256DigestFmt;
 use wtransport::Identity;
+use wtransport::tls::Sha256DigestFmt;
 
 /// Certificates are valid for 14 days (WebTransport spec maximum).
 /// Regenerate after 13 days to avoid last-minute expiry.
@@ -42,10 +42,7 @@ pub async fn get_or_create_identity() -> Result<Identity> {
                 id
             }
             Err(e) => {
-                println!(
-                    "Failed to load existing certs ({}), regenerating...",
-                    e
-                );
+                println!("Failed to load existing certs ({}), regenerating...", e);
                 generate_and_save_identity(&dir, &cert_path, &key_path).await?
             }
         }
@@ -81,10 +78,7 @@ async fn generate_and_save_identity(
         .store_secret_pemfile(key_path)
         .await?;
 
-    println!(
-        "Generated new self-signed certificate in {}",
-        dir.display()
-    );
+    println!("Generated new self-signed certificate in {}", dir.display());
     Ok(identity)
 }
 

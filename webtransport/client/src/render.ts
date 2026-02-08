@@ -1,4 +1,4 @@
-import type { Table } from 'apache-arrow';
+import type { RecordBatch, Schema, Table } from 'apache-arrow';
 
 export interface AppElements {
   queryInput: HTMLTextAreaElement;
@@ -80,6 +80,59 @@ export function renderArrowTable(table: Table, container: HTMLElement, maxRows =
     rowCount.textContent = `${table.numRows} rows`;
   }
   container.appendChild(rowCount);
+}
+
+export interface StreamingTableElements {
+  tbody: HTMLTableSectionElement;
+  rowCountEl: HTMLElement;
+}
+
+export function initStreamingTable(container: HTMLElement, schema: Schema): StreamingTableElements {
+  container.innerHTML = '';
+
+  const columnNames = schema.fields.map((f) => f.name);
+
+  const tableEl = document.createElement('table');
+  tableEl.className = 'arrow-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  for (const name of columnNames) {
+    const th = document.createElement('th');
+    th.textContent = name;
+    headerRow.appendChild(th);
+  }
+  thead.appendChild(headerRow);
+  tableEl.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  tableEl.appendChild(tbody);
+
+  container.appendChild(tableEl);
+
+  const rowCountEl = document.createElement('p');
+  rowCountEl.className = 'row-count';
+  rowCountEl.textContent = '0 rows';
+  container.appendChild(rowCountEl);
+
+  return { tbody, rowCountEl };
+}
+
+export function appendBatchRows(tbody: HTMLTableSectionElement, batch: RecordBatch, columnNames: string[]): void {
+  for (let i = 0; i < batch.numRows; i++) {
+    const tr = document.createElement('tr');
+    for (const name of columnNames) {
+      const td = document.createElement('td');
+      const value = batch.getChild(name)?.get(i);
+      td.textContent = value == null ? '' : String(value);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+export function updateRowCount(el: HTMLElement, count: number): void {
+  el.textContent = `${count} rows`;
 }
 
 type StatusKind = 'info' | 'error' | 'success';

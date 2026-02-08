@@ -79,14 +79,10 @@ mod tests {
 
     #[test]
     fn encode_empty_batch() {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("x", DataType::Int32, false),
-        ]));
-        let empty = RecordBatch::try_new(
-            schema,
-            vec![Arc::new(Int32Array::from(Vec::<i32>::new()))],
-        )
-        .unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int32, false)]));
+        let empty =
+            RecordBatch::try_new(schema, vec![Arc::new(Int32Array::from(Vec::<i32>::new()))])
+                .unwrap();
 
         let bytes = encode_batch(&empty).unwrap();
         assert!(!bytes.is_empty());

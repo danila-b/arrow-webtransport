@@ -1,13 +1,23 @@
-import { makeTable, tableToIPC } from 'apache-arrow';
+import { type Schema, makeTable, tableFromIPC, tableToIPC } from 'apache-arrow';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { decodeArrowTable } from '../decode.ts';
-import { createAppLayout, renderArrowTable, setStatus } from '../render.ts';
+import {
+  appendBatchRows,
+  createAppLayout,
+  initStreamingTable,
+  renderArrowTable,
+  setStatus,
+  updateRowCount,
+} from '../render.ts';
 
 function makeTestTable(rowCount: number) {
   const ids = Int32Array.from({ length: rowCount }, (_, i) => i + 1);
   const values = Float64Array.from({ length: rowCount }, (_, i) => i * 1.5);
   const ipc = tableToIPC(makeTable({ id: ids, value: values }), 'stream');
-  return decodeArrowTable(ipc);
+  return tableFromIPC(ipc);
+}
+
+function makeTestSchema(): Schema {
+  return makeTestTable(1).schema;
 }
 
 describe('createAppLayout', () => {
@@ -97,6 +107,116 @@ describe('renderArrowTable', () => {
 
     const rowCount = container.querySelector('.row-count');
     expect(rowCount?.textContent).toBe('3 rows');
+  });
+});
+
+describe('initStreamingTable', () => {
+  let container: HTMLDivElement;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+  });
+
+  it('creates table with correct column headers', () => {
+    const schema = makeTestSchema();
+    initStreamingTable(container, schema);
+
+    const headers = container.querySelectorAll('th');
+    expect(headers).toHaveLength(2);
+    expect(headers[0].textContent).toBe('id');
+    expect(headers[1].textContent).toBe('value');
+  });
+
+  it('creates an empty tbody', () => {
+    const schema = makeTestSchema();
+    initStreamingTable(container, schema);
+
+    const tbody = container.querySelector('tbody');
+    expect(tbody).not.toBeNull();
+    expect(tbody?.children).toHaveLength(0);
+  });
+
+  it('creates a row-count element with initial text', () => {
+    const schema = makeTestSchema();
+    initStreamingTable(container, schema);
+
+    const rowCount = container.querySelector('.row-count');
+    expect(rowCount).not.toBeNull();
+    expect(rowCount?.textContent).toBe('0 rows');
+  });
+
+  it('returns tbody and rowCountEl references', () => {
+    const schema = makeTestSchema();
+    const { tbody, rowCountEl } = initStreamingTable(container, schema);
+
+    expect(tbody).toBe(container.querySelector('tbody'));
+    expect(rowCountEl).toBe(container.querySelector('.row-count'));
+  });
+
+  it('clears existing container content', () => {
+    container.innerHTML = '<p>old content</p>';
+    const schema = makeTestSchema();
+    initStreamingTable(container, schema);
+
+    expect(container.querySelector('p.old')).toBeNull();
+    expect(container.querySelector('table')).not.toBeNull();
+  });
+});
+
+describe('appendBatchRows', () => {
+  let tbody: HTMLTableSectionElement;
+
+  beforeEach(() => {
+    tbody = document.createElement('tbody');
+  });
+
+  it('appends rows from a record batch', () => {
+    const table = makeTestTable(3);
+    const batch = table.batches[0];
+    const columnNames = table.schema.fields.map((f) => f.name);
+
+    appendBatchRows(tbody, batch, columnNames);
+
+    expect(tbody.querySelectorAll('tr')).toHaveLength(3);
+  });
+
+  it('renders correct cell values', () => {
+    const table = makeTestTable(2);
+    const batch = table.batches[0];
+    const columnNames = table.schema.fields.map((f) => f.name);
+
+    appendBatchRows(tbody, batch, columnNames);
+
+    const firstRowCells = tbody.querySelectorAll('tr:first-child td');
+    expect(firstRowCells[0].textContent).toBe('1');
+    expect(firstRowCells[1].textContent).toBe('0');
+  });
+
+  it('accumulates rows across multiple calls', () => {
+    const table = makeTestTable(3);
+    const batch = table.batches[0];
+    const columnNames = table.schema.fields.map((f) => f.name);
+
+    appendBatchRows(tbody, batch, columnNames);
+    appendBatchRows(tbody, batch, columnNames);
+
+    expect(tbody.querySelectorAll('tr')).toHaveLength(6);
+  });
+});
+
+describe('updateRowCount', () => {
+  it('sets text content with the count', () => {
+    const el = document.createElement('p');
+    updateRowCount(el, 42);
+    expect(el.textContent).toBe('42 rows');
+  });
+
+  it('updates on subsequent calls', () => {
+    const el = document.createElement('p');
+    updateRowCount(el, 5);
+    expect(el.textContent).toBe('5 rows');
+    updateRowCount(el, 10);
+    expect(el.textContent).toBe('10 rows');
   });
 });
 
