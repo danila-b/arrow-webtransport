@@ -8,3 +8,7 @@ wtransport = "0.7"
 tokio = { version = "1", features = ["full"] }
 arrow = "53"
 anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+filetime = "0.2"
