@@ -2,8 +2,8 @@
 
 This repo is a thesis prototype exploring **streaming analytical query results directly into the browser** using:
 
-- **Apache Arrow IPC stream** (columnar, efficient)
-- **Rust + DataFusion** for query execution
+- **Apache Arrow IPC stream** - efficient columnar format which we use on the wire to transport the data
+- **Rust + DataFusion** for query execution on the server
 - Two transports:
   - `http2-fetch/` — baseline: HTTP/2 + Fetch streaming
   - `webtransport/` — experimental: WebTransport over HTTP/3 (QUIC), with streams + datagrams
@@ -24,9 +24,12 @@ cd webtransport/client && npm run dev
 
 Open the client in your browser: [https://localhost:5173](https://localhost:5173)
 
+> [!NOTE]
+> You need to use a browser that supports WebTransport - for example, Chrome or Mozilla.
+
 ## Notes
 
-- Chrome is the target client for WebTransport.
+- The code is tested on Chrome browser.
 - This is a research prototype: the goal is to get reliable experiments and measurements, not a production-ready service.
 
 ## Linting
