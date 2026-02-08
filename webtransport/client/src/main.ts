@@ -1,18 +1,25 @@
 import { tableFromIPC } from 'apache-arrow';
 
+async function loadCertHash(): Promise<Uint8Array> {
+  const resp = await fetch('/cert-hash.json');
+  if (!resp.ok) {
+    throw new Error(
+      'Failed to load certificate hash. Make sure the server has been started at least once to generate certificates.',
+    );
+  }
+  const { hash } = (await resp.json()) as { hash: number[] };
+  return new Uint8Array(hash);
+}
+
 async function main() {
-  // IMPORTANT: Replace this hash with the one printed by your server
-  const certHash = new Uint8Array([
-    44, 72, 166, 24, 52, 195, 230, 39, 31, 28, 79, 14, 186, 83, 134, 87, 119, 45, 48, 185, 191, 12, 167, 38, 128, 158,
-    140, 219, 148, 220, 66, 190,
-  ]);
+  const certHash = await loadCertHash();
 
   // Create WebTransport connection with certificate hash
   const transport = new WebTransport('https://127.0.0.1:4433', {
     serverCertificateHashes: [
       {
         algorithm: 'sha-256',
-        value: certHash,
+        value: certHash.buffer as ArrayBuffer,
       },
     ],
   });
