@@ -10,6 +10,20 @@ This repo is a thesis prototype exploring **streaming analytical query results d
 
 The core thesis idea is “Flight-like streaming, but directly into the browser”: receive Arrow record batches incrementally, measure time-to-first-batch, and explore interactive UX features (progress + cancellation) enabled by WebTransport datagrams.
 
+## How to run 
+
+Run the server:
+```sh
+cd webtransport/server && cargo run
+```
+
+Run the client:
+```sh
+cd webtransport/client && npm run dev
+```
+
+Open the client in your browser: [https://localhost:5173](https://localhost:5173)
+
 ## Notes
 
 - Chrome is the target client for WebTransport.
