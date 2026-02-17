@@ -47,7 +47,7 @@ describe('createAppLayout', () => {
 
   it('sets default query value', () => {
     const els = createAppLayout(root);
-    expect(els.queryInput.value).toBe('get_arrow_data');
+    expect(els.queryInput.value).toBe('SELECT * FROM yellow_taxi LIMIT 1000');
   });
 });
 

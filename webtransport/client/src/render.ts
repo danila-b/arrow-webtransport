@@ -17,7 +17,7 @@ export function createAppLayout(root: HTMLElement): AppElements {
   const queryInput = document.createElement('textarea');
   queryInput.className = 'query-input';
   queryInput.placeholder = 'Enter query...';
-  queryInput.value = 'SELECT * FROM demo';
+  queryInput.value = 'SELECT * FROM yellow_taxi LIMIT 1000';
   queryInput.rows = 3;
 
   const runButton = document.createElement('button');
