@@ -1,7 +1,15 @@
 import './style.css';
 import { decodeBatchesFromStream } from './decode.ts';
 import { appendBatchRows, createAppLayout, initStreamingTable, setStatus, updateRowCount } from './render.ts';
-import { connect, loadCertHash, openQueryStream } from './transport.ts';
+import {
+  backoffDelayMs,
+  connect,
+  DEFAULT_RETRY_CONFIG,
+  isRetryableTransportError,
+  loadCertHash,
+  openQueryStream,
+  sleep,
+} from './transport.ts';
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app element');
@@ -16,42 +24,78 @@ runButton.addEventListener('click', async () => {
     setStatus(statusEl, 'Loading certificate...', 'info');
     const certHash = await loadCertHash();
 
-    setStatus(statusEl, 'Connecting...', 'info');
-    const transport = await connect(certHash);
-
-    setStatus(statusEl, 'Sending query...', 'info');
-    const reader = await openQueryStream(transport, queryInput.value);
-
-    setStatus(statusEl, 'Receiving data...', 'info');
-
-    const batches = decodeBatchesFromStream(reader);
-    const first = await batches.next();
-
-    if (first.done) {
-      setStatus(statusEl, 'Done — 0 rows received', 'success');
-      transport.close();
-      return;
-    }
-
-    const columnNames = first.value.schema.fields.map((f) => f.name);
-    const { tbody, rowCountEl } = initStreamingTable(tableContainer, first.value.schema);
-
+    const query = queryInput.value;
     let totalRows = 0;
-    appendBatchRows(tbody, first.value, columnNames);
-    totalRows += first.value.numRows;
-    updateRowCount(rowCountEl, totalRows);
-    setStatus(statusEl, `Receiving data... ${totalRows} rows`, 'info');
+    let columnNames: string[] | null = null;
+    let tbody: HTMLTableSectionElement | null = null;
+    let rowCountEl: HTMLElement | null = null;
+    const attempts = DEFAULT_RETRY_CONFIG.maxRetries + 1;
 
-    for await (const batch of batches) {
-      appendBatchRows(tbody, batch, columnNames);
-      totalRows += batch.numRows;
-      updateRowCount(rowCountEl, totalRows);
-      setStatus(statusEl, `Receiving data... ${totalRows} rows`, 'info');
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      let transport: WebTransport | null = null;
+      let shouldRetry = false;
+      let retryError: unknown = null;
+
+      try {
+        setStatus(
+          statusEl,
+          attempt === 1 ? 'Connecting...' : `Reconnecting... attempt ${attempt}/${attempts}`,
+          'info',
+        );
+
+        transport = await connect(certHash);
+
+        setStatus(statusEl, 'Sending query...', 'info');
+        const reader = await openQueryStream(transport, query);
+
+        let rowsToSkip = totalRows;
+        setStatus(statusEl, `Receiving data... ${totalRows} rows`, 'info');
+
+        for await (const batch of decodeBatchesFromStream(reader)) {
+          if (!columnNames || !tbody || !rowCountEl) {
+            columnNames = batch.schema.fields.map((f) => f.name);
+            const tableEls = initStreamingTable(tableContainer, batch.schema);
+            tbody = tableEls.tbody;
+            rowCountEl = tableEls.rowCountEl;
+          }
+
+          const startRow = Math.min(rowsToSkip, batch.numRows);
+          rowsToSkip -= startRow;
+
+          if (startRow < batch.numRows) {
+            appendBatchRows(tbody, batch, columnNames, startRow);
+            totalRows += batch.numRows - startRow;
+            updateRowCount(rowCountEl, totalRows);
+            setStatus(statusEl, `Receiving data... ${totalRows} rows`, 'info');
+          }
+        }
+
+        setStatus(statusEl, `Done — ${totalRows} rows received`, 'success');
+        return;
+      } catch (err) {
+        const hasMoreAttempts = attempt < attempts;
+        if (hasMoreAttempts && isRetryableTransportError(err)) {
+          shouldRetry = true;
+          retryError = err;
+        } else {
+          throw err;
+        }
+      } finally {
+        transport?.close();
+      }
+
+      if (shouldRetry) {
+        const delayMs = backoffDelayMs(attempt, DEFAULT_RETRY_CONFIG);
+        setStatus(
+          statusEl,
+          `Connection lost, retrying in ${delayMs}ms (kept ${totalRows} rows; requires stable row order)...`,
+          'info',
+        );
+        await sleep(delayMs);
+      } else if (retryError) {
+        throw retryError;
+      }
     }
-
-    setStatus(statusEl, `Done — ${totalRows} rows received`, 'success');
-
-    transport.close();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     setStatus(statusEl, message, 'error');

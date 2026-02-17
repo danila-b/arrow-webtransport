@@ -17,7 +17,7 @@ export function createAppLayout(root: HTMLElement): AppElements {
   const queryInput = document.createElement('textarea');
   queryInput.className = 'query-input';
   queryInput.placeholder = 'Enter query...';
-  queryInput.value = 'get_arrow_data';
+  queryInput.value = 'SELECT * FROM demo';
   queryInput.rows = 3;
 
   const runButton = document.createElement('button');
@@ -118,8 +118,13 @@ export function initStreamingTable(container: HTMLElement, schema: Schema): Stre
   return { tbody, rowCountEl };
 }
 
-export function appendBatchRows(tbody: HTMLTableSectionElement, batch: RecordBatch, columnNames: string[]): void {
-  for (let i = 0; i < batch.numRows; i++) {
+export function appendBatchRows(
+  tbody: HTMLTableSectionElement,
+  batch: RecordBatch,
+  columnNames: string[],
+  startRow = 0,
+): void {
+  for (let i = startRow; i < batch.numRows; i++) {
     const tr = document.createElement('tr');
     for (const name of columnNames) {
       const td = document.createElement('td');

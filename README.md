@@ -10,6 +10,20 @@ This repo is a thesis prototype exploring **streaming analytical query results d
 
 The core thesis idea is “Flight-like streaming, but directly into the browser”: receive Arrow record batches incrementally, measure time-to-first-batch, and explore interactive UX features (progress + cancellation) enabled by WebTransport datagrams.
 
+## How to clone
+
+This repository uses Git LFS to manage large Parquet dataset files. The data files are tracked with Git LFS and should download automatically when you clone the repository.
+
+Install Git LFS for your system: https://git-lfs.github.com/
+
+Then clone the repository:
+
+```sh
+git clone git@github.com:danila-b/arrow-webtransport.git
+```
+
+Verify that the dataset files have been downloaded correctly. You should see the Parquet files in the `data/nyc_yellow_taxi_dataset/` directory.
+
 ## How to run 
 
 Run the server:
