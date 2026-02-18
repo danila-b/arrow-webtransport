@@ -56,10 +56,15 @@ body {
   border-color: transparent;
 }
 
-/* Button */
+/* Buttons */
+
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
 
 .btn-run {
-  align-self: flex-start;
   border-radius: 6px;
   border: 1px solid transparent;
   padding: 0.5em 1.4em;
@@ -81,6 +86,63 @@ body {
   cursor: not-allowed;
 }
 
+.btn-cancel {
+  border-radius: 6px;
+  border: 1px solid transparent;
+  padding: 0.5em 1.4em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #e5484d;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-cancel:hover {
+  background-color: #cd2b31;
+}
+
+/* Progress bar */
+
+.progress-bar {
+  position: relative;
+  width: 100%;
+  height: 1.6rem;
+  background: #333;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(100, 108, 255, 0.5) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: progress-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.progress-bar__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+}
+
 /* Status */
 
 .status {
@@ -98,6 +160,28 @@ body {
 
 .status--success {
   color: #4ade80;
+}
+
+/* Stats panel */
+
+.stats-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 1.5rem;
+  padding: 0.75rem 1rem;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.stats-panel__label {
+  color: #888;
+}
+
+.stats-panel__value {
+  font-family: monospace;
+  text-align: right;
 }
 
 /* Arrow table */
@@ -170,5 +254,28 @@ body {
 
   .arrow-table tbody tr:hover {
     background: rgba(0, 0, 0, 0.04);
+  }
+
+  .progress-bar {
+    background: #e0e0e0;
+  }
+
+  .progress-bar__fill {
+    background: linear-gradient(90deg, transparent 0%, rgba(100, 108, 255, 0.35) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: progress-sweep 1.4s ease-in-out infinite;
+  }
+
+  .progress-bar__label {
+    color: rgba(0, 0, 0, 0.75);
+  }
+
+  .stats-panel {
+    background: #f5f5f5;
+    border-color: #ddd;
+  }
+
+  .stats-panel__label {
+    color: #666;
   }
 }

@@ -50,6 +50,91 @@ export async function openQueryStream(
   return stream.readable.getReader();
 }
 
+export interface ProgressMessage {
+  type: 'progress';
+  rows: number;
+  batches: number;
+  bytes?: number;
+}
+
+export function instrumentReader(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onChunk: (byteLength: number, time: number) => void,
+): ReadableStreamDefaultReader<Uint8Array> {
+  return {
+    read: async () => {
+      const result = await reader.read();
+      if (!result.done && result.value) {
+        onChunk(result.value.byteLength, performance.now());
+      }
+      return result;
+    },
+    cancel: (reason?: unknown) => reader.cancel(reason),
+    releaseLock: () => reader.releaseLock(),
+    closed: reader.closed,
+  } as ReadableStreamDefaultReader<Uint8Array>;
+}
+
+export async function sendCancelDatagram(transport: WebTransport): Promise<void> {
+  const writer = transport.datagrams.writable.getWriter();
+  try {
+    await writer.write(new TextEncoder().encode(JSON.stringify({ type: 'cancel' })));
+  } finally {
+    writer.releaseLock();
+  }
+}
+
+export interface DatagramListener {
+  stop(): void;
+  done: Promise<void>;
+}
+
+export interface DatagramCallbacks {
+  onProgress: (msg: ProgressMessage) => void;
+  onCancelAck?: () => void;
+}
+
+export function listenForDatagrams(
+  transport: WebTransport,
+  callbacks: DatagramCallbacks | ((msg: ProgressMessage) => void),
+): DatagramListener {
+  const { onProgress, onCancelAck } =
+    typeof callbacks === 'function' ? { onProgress: callbacks, onCancelAck: undefined } : callbacks;
+
+  const reader = transport.datagrams.readable.getReader();
+  let stopped = false;
+
+  const done = (async () => {
+    const decoder = new TextDecoder();
+    try {
+      while (!stopped) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        try {
+          const msg = JSON.parse(decoder.decode(value));
+          if (msg.type === 'progress') {
+            onProgress(msg as ProgressMessage);
+          } else if (msg.type === 'cancel_ack' && onCancelAck) {
+            onCancelAck();
+          }
+        } catch {
+          // ignore malformed datagrams
+        }
+      }
+    } catch {
+      // reader cancelled or connection closed
+    }
+  })();
+
+  return {
+    stop() {
+      stopped = true;
+      reader.cancel().catch(() => {});
+    },
+    done,
+  };
+}
+
 export function isRetryableTransportError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
 

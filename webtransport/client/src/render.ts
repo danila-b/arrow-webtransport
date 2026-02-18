@@ -1,9 +1,14 @@
 import type { RecordBatch, Schema, Table } from 'apache-arrow';
+import type { QueryStats } from './stats.ts';
 
 export interface AppElements {
   queryInput: HTMLTextAreaElement;
   runButton: HTMLButtonElement;
+  cancelButton: HTMLButtonElement;
   statusEl: HTMLElement;
+  progressContainer: HTMLElement;
+  progressLabel: HTMLElement;
+  statsContainer: HTMLElement;
   tableContainer: HTMLElement;
 }
 
@@ -20,19 +25,54 @@ export function createAppLayout(root: HTMLElement): AppElements {
   queryInput.value = 'SELECT * FROM yellow_taxi LIMIT 1000';
   queryInput.rows = 3;
 
+  const buttonRow = document.createElement('div');
+  buttonRow.className = 'button-row';
+
   const runButton = document.createElement('button');
   runButton.className = 'btn-run';
   runButton.textContent = 'Run';
 
+  const cancelButton = document.createElement('button');
+  cancelButton.className = 'btn-cancel';
+  cancelButton.textContent = 'Cancel';
+  cancelButton.hidden = true;
+
+  buttonRow.append(runButton, cancelButton);
+
+  const progressContainer = document.createElement('div');
+  progressContainer.className = 'progress-bar';
+  progressContainer.hidden = true;
+
+  const progressFill = document.createElement('div');
+  progressFill.className = 'progress-bar__fill';
+
+  const progressLabel = document.createElement('span');
+  progressLabel.className = 'progress-bar__label';
+
+  progressContainer.append(progressFill, progressLabel);
+
   const statusEl = document.createElement('div');
   statusEl.className = 'status';
+
+  const statsContainer = document.createElement('div');
+  statsContainer.className = 'stats-panel';
+  statsContainer.hidden = true;
 
   const tableContainer = document.createElement('div');
   tableContainer.className = 'table-container';
 
-  root.append(heading, queryInput, runButton, statusEl, tableContainer);
+  root.append(heading, queryInput, buttonRow, progressContainer, statusEl, statsContainer, tableContainer);
 
-  return { queryInput, runButton, statusEl, tableContainer };
+  return {
+    queryInput,
+    runButton,
+    cancelButton,
+    statusEl,
+    progressContainer,
+    progressLabel,
+    statsContainer,
+    tableContainer,
+  };
 }
 
 const DEFAULT_MAX_ROWS = 100;
@@ -123,8 +163,10 @@ export function appendBatchRows(
   batch: RecordBatch,
   columnNames: string[],
   startRow = 0,
+  endRow?: number,
 ): void {
-  for (let i = startRow; i < batch.numRows; i++) {
+  const end = endRow != null ? Math.min(endRow, batch.numRows) : batch.numRows;
+  for (let i = startRow; i < end; i++) {
     const tr = document.createElement('tr');
     for (const name of columnNames) {
       const td = document.createElement('td');
@@ -136,8 +178,24 @@ export function appendBatchRows(
   }
 }
 
-export function updateRowCount(el: HTMLElement, count: number): void {
-  el.textContent = `${count} rows`;
+export function updateRowCount(el: HTMLElement, displayed: number, total?: number): void {
+  if (total != null && total > displayed) {
+    el.textContent = `Showing ${displayed} of ${total} rows`;
+  } else {
+    el.textContent = `${displayed} rows`;
+  }
+}
+
+export function showProgressBar(container: HTMLElement): void {
+  container.hidden = false;
+}
+
+export function hideProgressBar(container: HTMLElement): void {
+  container.hidden = true;
+}
+
+export function updateProgress(label: HTMLElement, rows: number, batches: number): void {
+  label.textContent = `${rows.toLocaleString()} rows, ${batches} ${batches === 1 ? 'batch' : 'batches'}`;
 }
 
 type StatusKind = 'info' | 'error' | 'success';
@@ -145,4 +203,64 @@ type StatusKind = 'info' | 'error' | 'success';
 export function setStatus(el: HTMLElement, message: string, kind: StatusKind = 'info'): void {
   el.textContent = message;
   el.className = `status status--${kind}`;
+}
+
+export function showStatsPanel(container: HTMLElement): void {
+  container.hidden = false;
+}
+
+export function resetStatsPanel(container: HTMLElement): void {
+  container.innerHTML = '';
+}
+
+function formatMs(ms: number): string {
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`;
+}
+
+function addStatRow(container: HTMLElement, label: string, value: string): void {
+  const labelEl = document.createElement('span');
+  labelEl.className = 'stats-panel__label';
+  labelEl.textContent = label;
+
+  const valueEl = document.createElement('span');
+  valueEl.className = 'stats-panel__value';
+  valueEl.textContent = value;
+
+  container.append(labelEl, valueEl);
+}
+
+export function renderStats(container: HTMLElement, stats: QueryStats): void {
+  container.innerHTML = '';
+
+  addStatRow(container, 'Connection setup', formatMs(stats.connectionSetupMs));
+
+  addStatRow(container, 'Time to first byte', stats.ttfbMs !== null ? formatMs(stats.ttfbMs) : '\u2014');
+
+  addStatRow(container, 'Total time', formatMs(stats.totalTimeMs));
+
+  addStatRow(container, 'Connection restarts', String(stats.connectionRestarts));
+
+  if (stats.throughputRowsPerSec !== null && stats.throughputMBPerSec !== null) {
+    const rowsPerSec = Math.round(stats.throughputRowsPerSec).toLocaleString();
+    const mbPerSec = stats.throughputMBPerSec.toFixed(2);
+    addStatRow(container, 'Throughput', `${rowsPerSec} rows/sec (${mbPerSec} MB/sec)`);
+  } else {
+    addStatRow(container, 'Throughput', '\u2014');
+  }
+
+  addStatRow(
+    container,
+    'Cancellation latency',
+    stats.cancelLatencyMs !== null ? formatMs(stats.cancelLatencyMs) : 'N/A',
+  );
+
+  if (stats.longTaskCount > 0) {
+    addStatRow(
+      container,
+      'Long tasks',
+      `${stats.longTaskCount} (${Math.round(stats.longTaskTotalMs)}ms total blocked)`,
+    );
+  } else {
+    addStatRow(container, 'Long tasks', 'None');
+  }
 }
