@@ -1,8 +1,10 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use datafusion::prelude::SessionContext;
 use futures::TryStreamExt;
+use wtransport::Connection;
 
 use crate::encode::StreamEncoder;
 
@@ -23,20 +25,13 @@ pub async fn handle_session(
         Ok((mut send, mut recv)) => {
             println!("Accepted bidirectional stream");
 
-            // Read the full query string (loop until EOF).
             let mut query_bytes = Vec::new();
             let mut buffer = vec![0u8; 4096];
-            loop {
-                match recv.read(&mut buffer).await? {
-                    Some(n) => query_bytes.extend_from_slice(&buffer[..n]),
-                    None => break, // stream closed by client
-                }
-            }
+            while let Some(n) = recv.read(&mut buffer).await? { .. query_bytes.extend_from_slice(&buffer[..n]); }
 
             let query = String::from_utf8(query_bytes)?;
             println!("Received query: {}", query);
 
-            // Execute via DataFusion.
             let df = match ctx.sql(&query).await {
                 Ok(df) => df,
                 Err(e) => {
@@ -59,44 +54,93 @@ pub async fn handle_session(
 
             let schema = stream.schema();
 
-            // Encode and send IPC schema header.
             let mut encoder = StreamEncoder::try_new(&schema)?;
             let header = encoder.drain();
             send.write_all(&header).await?;
             println!("Sent IPC schema header ({} bytes)", header.len());
 
-            // Stream record batches incrementally.
             let mut batch_count = 0usize;
             let mut total_rows = 0usize;
-            while let Some(batch) = stream.try_next().await? {
-                let rows = batch.num_rows();
-                encoder.write_batch(&batch)?;
-                let chunk = encoder.drain();
-                send.write_all(&chunk).await?;
+            let mut total_bytes = header.len();
+            let mut cancelled = false;
 
-                batch_count += 1;
-                total_rows += rows;
-                println!(
-                    "Sent batch {} ({} rows, {} bytes)",
-                    batch_count,
-                    rows,
-                    chunk.len()
-                );
+            loop {
+                tokio::select! {
+                    batch_result = stream.try_next() => {
+                        match batch_result? {
+                            Some(batch) => {
+                                let rows = batch.num_rows();
+                                encoder.write_batch(&batch)?;
+                                let chunk = encoder.drain();
+                                send.write_all(&chunk).await?;
+
+                                batch_count += 1;
+                                total_rows += rows;
+                                total_bytes += chunk.len();
+                                println!(
+                                    "Sent batch {} ({} rows, {} bytes)",
+                                    batch_count, rows, chunk.len()
+                                );
+
+                                send_progress(&connection, total_rows, batch_count, total_bytes);
+                            }
+                            None => break,
+                        }
+                    }
+                    datagram_result = connection.receive_datagram() => {
+                        if let Ok(dg) = datagram_result {
+                            let payload = dg.payload();
+                            if is_cancel_payload(&payload) {
+                                println!("Cancel requested by client");
+                                let _ = connection.send_datagram(b"{\"type\":\"cancel_ack\"}");
+                                cancelled = true;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
-            // Write EOS marker.
             encoder.finish()?;
             let footer = encoder.drain();
             send.write_all(&footer).await?;
             send.finish().await?;
 
-            println!(
-                "Query complete: {} batches, {} total rows",
-                batch_count, total_rows
-            );
+            if cancelled {
+                println!(
+                    "Query cancelled after {} batches, {} total rows",
+                    batch_count, total_rows
+                );
+            } else {
+                println!(
+                    "Query complete: {} batches, {} total rows",
+                    batch_count, total_rows
+                );
+            }
         }
         Err(e) => eprintln!("Error accepting stream: {}", e),
     }
 
+    // Keep the connection alive until the client closes it (or timeout),
+    // so the stream FIN is delivered before CONNECTION_CLOSE happens due to object going out of scope.
+    let _ = tokio::time::timeout(Duration::from_secs(5), connection.closed()).await;
+
     Ok(())
+}
+
+fn send_progress(connection: &Connection, rows: usize, batches: usize, bytes: usize) {
+    let msg = serde_json::json!({
+        "type": "progress",
+        "rows": rows,
+        "batches": batches,
+        "bytes": bytes
+    });
+    let _ = connection.send_datagram(msg.to_string().as_bytes());
+}
+
+fn is_cancel_payload(payload: &[u8]) -> bool {
+    let Ok(msg) = serde_json::from_slice::<serde_json::Value>(payload) else {
+        return false;
+    };
+    msg.get("type").and_then(|v| v.as_str()) == Some("cancel")
 }

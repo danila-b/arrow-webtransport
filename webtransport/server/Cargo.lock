@@ -2586,6 +2586,7 @@ dependencies = [
  "datafusion",
  "filetime",
  "futures",
+ "serde_json",
  "tempfile",
  "tokio",
  "wtransport",

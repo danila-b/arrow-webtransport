@@ -46,13 +46,21 @@ fn parquet_glob_path() -> Result<String> {
 pub async fn create_context() -> Result<SessionContext> {
     let mut config = SessionConfig::new();
     // Client JS Arrow library doesn't support View types, so we disable them for now to ensure compatibility.
-    config.options_mut().execution.parquet.schema_force_view_types = false;
+    config
+        .options_mut()
+        .execution
+        .parquet
+        .schema_force_view_types = false;
 
     let ctx = SessionContext::new_with_config(config);
 
     let parquet_glob = parquet_glob_path()?;
-    ctx.register_parquet(TAXI_TABLE_NAME, &parquet_glob, ParquetReadOptions::default())
-        .await?;
+    ctx.register_parquet(
+        TAXI_TABLE_NAME,
+        &parquet_glob,
+        ParquetReadOptions::default(),
+    )
+    .await?;
     println!(
         "Registered table '{}' from {}",
         TAXI_TABLE_NAME, parquet_glob
