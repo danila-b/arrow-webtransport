@@ -93,7 +93,6 @@ bulk throughput. The TTFB numbers already show this: 11 ms vs 83 ms.
 
 1. **Decouple encoding from writing** — use the same mpsc channel + spawned task
    pattern in the WebTransport server so encoding runs ahead of the network.
-   - Update: First attempt implemented
 2. **Tune QUIC transport config** — increase quinn's `send_window` /
    `receive_window` / `initial_window` (e.g. 8–16 MB) to reduce flow control stalls.
 3. **Reduce progress datagram frequency** — send every Nth batch or on a timer,
@@ -102,3 +101,38 @@ bulk throughput. The TTFB numbers already show this: 11 ms vs 83 ms.
    thesis, both transports should either use TLS or neither should.
 5. **Coalesce writes** — buffer 2–4 encoded batches and write them as one larger
    chunk to amortize QUIC framing and flow control overhead.
+
+## Updates
+
+### Attempt 1: Decouple encoding from writing
+
+Applied the mpsc channel + spawned producer task pattern (item 1 above). Encoding
+now runs in a separate tokio task, feeding a 16-slot channel; the session task
+consumes from the channel and calls `write_all`.
+
+**Result:** negligible improvement (a few percent at most).
+
+**Why:** Encoding is fast (~microseconds per 1.17 MB batch). The real bottleneck is
+`write_all` blocking on QUIC flow control — quinn's default stream receive window
+(~1 MB) is smaller than a single batch, so every write stalls waiting for
+MAX_STREAM_DATA. The producer fills the channel almost instantly and then blocks on
+`tx.send()` too. The pipeline is serialized at the network layer, not the encoding
+layer.
+
+### Attempt 2: Tune QUIC windows + coalesce writes + reduce overhead
+
+Applied items 1, 2, 3, and 5 together:
+
+- **QUIC transport config** — `send_window` 8 MB, `stream_receive_window` 8 MB,
+  `receive_window` 16 MB (via `with_custom_transport` + quinn feature).
+- **Write coalescing** — consumer drains all ready chunks with `try_recv()` and
+  combines them into a single `write_all`, reducing QUIC framing and flow control
+  interactions.
+- **Reduced per-batch overhead** — removed `println!` from the hot path (both
+  producer and consumer); progress datagrams sent once per coalesced write instead
+  of once per batch.
+- **Biased `tokio::select!`** — always prefers the data path over cancel-datagram
+  polling.
+
+**Result:** modest improvement - ~50% faster throughput, but still much slower than HTTP/2 Arrow.
+

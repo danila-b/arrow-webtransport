@@ -27,8 +27,6 @@ pub async fn handle_session(
 
     match connection.accept_bi().await {
         Ok((mut send, mut recv)) => {
-            println!("Accepted bidirectional stream");
-
             let mut query_bytes = Vec::new();
             let mut buffer = vec![0u8; 4096];
             while let Some(n) = recv.read(&mut buffer).await? {
@@ -36,7 +34,7 @@ pub async fn handle_session(
             }
 
             let query = String::from_utf8(query_bytes)?;
-            println!("Received query: {}", query);
+            println!("Received query: {query}");
 
             let df = match ctx.sql(&query).await {
                 Ok(df) => df,
@@ -62,7 +60,6 @@ pub async fn handle_session(
 
             let mut encoder = StreamEncoder::try_new(&schema)?;
             let header = encoder.drain();
-            let header_len = header.len();
 
             let (tx, mut rx) = tokio::sync::mpsc::channel::<EncodedChunk>(16);
 
@@ -72,11 +69,8 @@ pub async fn handle_session(
             })
             .await
             .map_err(|_| anyhow::anyhow!("channel closed"))?;
-            println!("Queued IPC schema header ({header_len} bytes)");
 
             tokio::spawn(async move {
-                let mut batch_count = 0usize;
-
                 while let Some(batch) = stream.try_next().await.transpose() {
                     match batch {
                         Ok(batch) => {
@@ -86,13 +80,7 @@ pub async fn handle_session(
                                 break;
                             }
                             let chunk = encoder.drain();
-                            batch_count += 1;
-                            println!(
-                                "Encoded batch {batch_count} ({rows} rows, {} bytes)",
-                                chunk.len()
-                            );
                             if tx.send(EncodedChunk { data: chunk, rows }).await.is_err() {
-                                println!("Consumer dropped, cancelling query");
                                 return;
                             }
                         }
@@ -114,7 +102,6 @@ pub async fn handle_session(
                         rows: 0,
                     })
                     .await;
-                println!("Query encoding complete: {batch_count} batches");
             });
 
             let mut batch_count = 0usize;
@@ -124,18 +111,29 @@ pub async fn handle_session(
 
             loop {
                 tokio::select! {
+                    biased;
                     chunk = rx.recv() => {
                         match chunk {
-                            Some(c) => {
-                                send.write_all(&c.data).await?;
-                                total_bytes += c.data.len();
-                                if c.rows > 0 {
-                                    batch_count += 1;
-                                    total_rows += c.rows;
-                                    println!(
-                                        "Sent batch {batch_count} ({} rows, {} bytes)",
-                                        c.rows, c.data.len()
-                                    );
+                            Some(first) => {
+                                let mut combined = first.data;
+                                let mut chunk_rows = first.rows;
+                                let mut chunk_batches =
+                                    if first.rows > 0 { 1usize } else { 0 };
+
+                                while let Ok(more) = rx.try_recv() {
+                                    combined.extend_from_slice(&more.data);
+                                    chunk_rows += more.rows;
+                                    if more.rows > 0 {
+                                        chunk_batches += 1;
+                                    }
+                                }
+
+                                send.write_all(&combined).await?;
+                                total_bytes += combined.len();
+                                batch_count += chunk_batches;
+                                total_rows += chunk_rows;
+
+                                if chunk_batches > 0 {
                                     send_progress(
                                         &connection, total_rows, batch_count, total_bytes,
                                     );
@@ -161,12 +159,16 @@ pub async fn handle_session(
             send.finish().await?;
 
             if cancelled {
-                println!("Query cancelled after {batch_count} batches, {total_rows} total rows",);
+                println!(
+                    "Query cancelled after {batch_count} batches, {total_rows} total rows",
+                );
             } else {
-                println!("Query complete: {batch_count} batches, {total_rows} total rows",);
+                println!(
+                    "Query complete: {batch_count} batches, {total_rows} total rows, {total_bytes} bytes",
+                );
             }
         }
-        Err(e) => eprintln!("Error accepting stream: {}", e),
+        Err(e) => eprintln!("Error accepting stream: {e}"),
     }
 
     let _ = tokio::time::timeout(Duration::from_secs(5), connection.closed()).await;

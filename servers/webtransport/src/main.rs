@@ -4,6 +4,7 @@ mod session;
 use std::sync::Arc;
 
 use anyhow::Result;
+use wtransport::config::QuicTransportConfig;
 use wtransport::{Endpoint, ServerConfig};
 
 #[tokio::main]
@@ -12,9 +13,14 @@ async fn main() -> Result<()> {
 
     let ctx = Arc::new(server_core::query::create_context().await?);
 
+    let mut transport = QuicTransportConfig::default();
+    transport.send_window(8 * 1024 * 1024);
+    transport.receive_window(quinn::VarInt::from_u32(16 * 1024 * 1024));
+    transport.stream_receive_window(quinn::VarInt::from_u32(8 * 1024 * 1024));
+
     let config = ServerConfig::builder()
         .with_bind_default(4433)
-        .with_identity(identity)
+        .with_custom_transport(identity, transport)
         .build();
 
     let server = Endpoint::server(config)?;
