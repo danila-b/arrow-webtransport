@@ -44,4 +44,18 @@ export default defineConfig({
     }),
     certHashPlugin(),
   ],
+  server: {
+    proxy: {
+      '/api/arrow': {
+        target: 'https://127.0.0.1:3000',
+        secure: false,
+        rewrite: (p) => p.replace(/^\/api\/arrow/, ''),
+      },
+      '/api/json': {
+        target: 'https://127.0.0.1:3001',
+        secure: false,
+        rewrite: (p) => p.replace(/^\/api\/json/, ''),
+      },
+    },
+  },
 });

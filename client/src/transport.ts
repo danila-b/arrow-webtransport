@@ -219,7 +219,7 @@ export class WebTransportAdapter implements QueryTransport {
 // HTTP/2 Arrow IPC adapter
 // ---------------------------------------------------------------------------
 
-const HTTP_ARROW_URL = 'http://127.0.0.1:3000/query';
+const HTTP_ARROW_URL = '/api/arrow/query';
 
 export class HttpArrowAdapter implements QueryTransport {
   readonly name = 'HTTP/2 Arrow IPC';
@@ -278,7 +278,7 @@ export class HttpArrowAdapter implements QueryTransport {
 // HTTP/2 JSON adapter
 // ---------------------------------------------------------------------------
 
-const HTTP_JSON_URL = 'http://127.0.0.1:3001/query';
+const HTTP_JSON_URL = '/api/json/query';
 
 export class HttpJsonAdapter implements QueryTransport {
   readonly name = 'HTTP/2 JSON';

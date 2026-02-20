@@ -1,59 +1,16 @@
 use anyhow::Result;
-use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
+use server_core::certs;
 use wtransport::Identity;
 use wtransport::tls::Sha256DigestFmt;
 
-/// Certificates are valid for 14 days (WebTransport spec maximum).
-/// Regenerate after 13 days to avoid last-minute expiry.
-pub const CERT_MAX_AGE: Duration = Duration::from_secs(13 * 24 * 3600);
-
-pub fn certs_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join("certs")
-}
-
-/// Check whether the certificate file is older than `CERT_MAX_AGE`.
-pub fn cert_needs_refresh(cert_path: &Path) -> bool {
-    let Ok(meta) = std::fs::metadata(cert_path) else {
-        return true;
-    };
-    let Ok(modified) = meta.modified() else {
-        return true;
-    };
-    let age = SystemTime::now()
-        .duration_since(modified)
-        .unwrap_or(Duration::MAX);
-    age > CERT_MAX_AGE
-}
-
-/// Load an existing certificate from PEM files, or generate a new self-signed
-/// one. Persists cert + key as PEM and writes the SHA-256 hash to a JSON file
-/// so the browser client can read it automatically.
+/// Load or generate PEM certificates via the shared `server-core` certs module,
+/// then convert them to a `wtransport::Identity` and write the SHA-256 hash
+/// to `cert-hash.json` (needed for browser cert pinning).
 pub async fn get_or_create_identity() -> Result<Identity> {
-    let dir = certs_dir();
-    let cert_path = dir.join("cert.pem");
-    let key_path = dir.join("key.pem");
-    let hash_path = dir.join("cert-hash.json");
+    let (cert_path, key_path) = certs::ensure_certs()?;
+    let hash_path = certs::certs_dir().join("cert-hash.json");
 
-    let identity = if cert_path.exists() && key_path.exists() && !cert_needs_refresh(&cert_path) {
-        match Identity::load_pemfiles(&cert_path, &key_path).await {
-            Ok(id) => {
-                println!("Loaded existing certificate from {}", dir.display());
-                id
-            }
-            Err(e) => {
-                println!("Failed to load existing certs ({}), regenerating...", e);
-                generate_and_save_identity(&dir, &cert_path, &key_path).await?
-            }
-        }
-    } else {
-        if cert_path.exists() && cert_needs_refresh(&cert_path) {
-            println!("Certificate expired, regenerating...");
-        }
-        generate_and_save_identity(&dir, &cert_path, &key_path).await?
-    };
+    let identity = Identity::load_pemfiles(&cert_path, &key_path).await?;
 
     let hash = identity.certificate_chain().as_slice()[0].hash();
     let hash_array_str = hash.fmt(Sha256DigestFmt::BytesArray);
@@ -64,30 +21,11 @@ pub async fn get_or_create_identity() -> Result<Identity> {
     Ok(identity)
 }
 
-async fn generate_and_save_identity(
-    dir: &Path,
-    cert_path: &Path,
-    key_path: &Path,
-) -> Result<Identity> {
-    let identity = Identity::self_signed(["localhost", "127.0.0.1"])?;
-
-    std::fs::create_dir_all(dir)?;
-
-    let cert = &identity.certificate_chain().as_slice()[0];
-    cert.store_pemfile(cert_path).await?;
-    identity
-        .private_key()
-        .store_secret_pemfile(key_path)
-        .await?;
-
-    println!("Generated new self-signed certificate in {}", dir.display());
-    Ok(identity)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use server_core::certs::cert_needs_refresh;
     use std::fs;
+    use std::path::Path;
 
     #[test]
     fn refresh_needed_for_nonexistent_file() {

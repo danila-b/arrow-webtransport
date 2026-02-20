@@ -131,8 +131,13 @@ async fn main() -> anyhow::Result<()> {
         .layer(cors);
 
     let addr: SocketAddr = "127.0.0.1:3000".parse().unwrap();
-    println!("HTTP/2 Arrow server listening on http://{addr} (POST /query)");
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    let (cert_path, key_path) = server_core::certs::ensure_certs()?;
+    let tls_config =
+        axum_server::tls_rustls::RustlsConfig::from_pem_file(cert_path, key_path).await?;
+
+    println!("HTTP/2 Arrow server listening on https://{addr} (POST /query)");
+    axum_server::bind_rustls(addr, tls_config)
+        .serve(app.into_make_service())
+        .await?;
     Ok(())
 }

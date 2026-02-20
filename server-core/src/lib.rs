@@ -1,3 +1,4 @@
+pub mod certs;
 pub mod encode;
 pub mod query;
 

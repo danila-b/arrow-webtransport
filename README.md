@@ -31,13 +31,8 @@ Verify the Parquet files exist in `data/nyc_yellow_taxi_dataset/`.
 - [`just`](https://github.com/casey/just) command runner (recommended)
 - A Chromium-based browser (required for WebTransport)
 
-### 1. Install client dependencies
 
-```sh
-cd client && npm install
-```
-
-### 2. Quick start 
+### Quick start 
 
 ```sh
 # Everything — all three servers + client dev server (Ctrl+C stops all)
@@ -54,33 +49,10 @@ just servers webtransport
 just servers http2-arrow http2-json
 ```
 
-### 2b. Manual start (without `just`)
+## Notes
 
-Each server is a separate binary in the Cargo workspace. Start whichever ones you need (or all of them). Run these from the repo root:
-
-```sh
-# WebTransport server (port 4433) — Arrow IPC over QUIC
-cargo run -p server-webtransport
-
-# HTTP/2 Arrow server (port 3000) — Arrow IPC over HTTP
-cargo run -p server-http2-arrow
-
-# HTTP/2 JSON server (port 3001) — JSON over HTTP
-cargo run -p server-http2-json
-```
-
-You can run them in separate terminals. Only the ones you plan to test need to be running.
-
-### 3. Start the client
-
-```sh
-cd client && npm run dev
-```
-
-Open [https://localhost:5173](https://localhost:5173) in Chrome. Use the transport picker at the top to select which server to query.
-
-> [!NOTE]
-> The WebTransport option requires starting the WebTransport server first, since it generates the certificate that the client needs.
+- Tested on Chrome. WebTransport requires a Chromium-based browser.
+- This is a research prototype: the goal is reliable experiments and measurements, not a production service.
 
 ## Running tests
 
@@ -92,11 +64,6 @@ cargo test
 cd client && npm test
 ```
 
-## Notes
-
-- Tested on Chrome. WebTransport requires a Chromium-based browser.
-- This is a research prototype: the goal is reliable experiments and measurements, not a production service.
-
 ## Linting
 
 Lint the entire repo (Rust + TypeScript) in one command:
@@ -105,19 +72,7 @@ Lint the entire repo (Rust + TypeScript) in one command:
 just lint
 ```
 
-Or run linters individually:
 
-**TypeScript** (via [Biome](https://biomejs.dev/) — config in `biome.json`):
 
-```sh
-cd client
-npm run lint
-npm run lint:fix
-```
 
-**Rust** (via rustfmt + clippy — config in `rustfmt.toml` / `clippy.toml`):
 
-```sh
-cargo fmt
-cargo clippy
-```

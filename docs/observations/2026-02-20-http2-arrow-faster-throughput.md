@@ -104,7 +104,7 @@ bulk throughput. The TTFB numbers already show this: 11 ms vs 83 ms.
 
 ## Updates
 
-### Attempt 1: Decouple encoding from writing
+### Update 1: Decouple encoding from writing
 
 Applied the mpsc channel + spawned producer task pattern (item 1 above). Encoding
 now runs in a separate tokio task, feeding a 16-slot channel; the session task
@@ -119,7 +119,7 @@ MAX_STREAM_DATA. The producer fills the channel almost instantly and then blocks
 `tx.send()` too. The pipeline is serialized at the network layer, not the encoding
 layer.
 
-### Attempt 2: Tune QUIC windows + coalesce writes + reduce overhead
+### Update 2: Tune QUIC windows + coalesce writes + reduce overhead
 
 Applied items 1, 2, 3, and 5 together:
 
@@ -136,3 +136,8 @@ Applied items 1, 2, 3, and 5 together:
 
 **Result:** modest improvement - ~50% faster throughput, but still much slower than HTTP/2 Arrow.
 
+### Update 3: Run HTTP/2 over TLS too
+
+Applied item 4 above. The HTTP/2 Arrow server now runs over TLS.
+
+**Result:** no significant downgrade in throughput for them, the gap still exists between WebTransport and HTTP/2 Arrow. JSON server is still slower than any of the other two.
