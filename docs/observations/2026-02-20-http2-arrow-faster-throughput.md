@@ -93,6 +93,7 @@ bulk throughput. The TTFB numbers already show this: 11 ms vs 83 ms.
 
 1. **Decouple encoding from writing** — use the same mpsc channel + spawned task
    pattern in the WebTransport server so encoding runs ahead of the network.
+   - Update: First attempt implemented
 2. **Tune QUIC transport config** — increase quinn's `send_window` /
    `receive_window` / `initial_window` (e.g. 8–16 MB) to reduce flow control stalls.
 3. **Reduce progress datagram frequency** — send every Nth batch or on a timer,

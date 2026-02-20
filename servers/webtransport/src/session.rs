@@ -7,6 +7,11 @@ use server_core::datafusion::prelude::SessionContext;
 use server_core::encode::StreamEncoder;
 use wtransport::Connection;
 
+struct EncodedChunk {
+    data: Vec<u8>,
+    rows: usize,
+}
+
 pub async fn handle_session(
     incoming_session: wtransport::endpoint::IncomingSession,
     ctx: Arc<SessionContext>,
@@ -57,33 +62,84 @@ pub async fn handle_session(
 
             let mut encoder = StreamEncoder::try_new(&schema)?;
             let header = encoder.drain();
-            send.write_all(&header).await?;
-            println!("Sent IPC schema header ({} bytes)", header.len());
+            let header_len = header.len();
+
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<EncodedChunk>(16);
+
+            tx.send(EncodedChunk {
+                data: header,
+                rows: 0,
+            })
+            .await
+            .map_err(|_| anyhow::anyhow!("channel closed"))?;
+            println!("Queued IPC schema header ({header_len} bytes)");
+
+            tokio::spawn(async move {
+                let mut batch_count = 0usize;
+
+                while let Some(batch) = stream.try_next().await.transpose() {
+                    match batch {
+                        Ok(batch) => {
+                            let rows = batch.num_rows();
+                            if let Err(e) = encoder.write_batch(&batch) {
+                                eprintln!("Encode error: {e}");
+                                break;
+                            }
+                            let chunk = encoder.drain();
+                            batch_count += 1;
+                            println!(
+                                "Encoded batch {batch_count} ({rows} rows, {} bytes)",
+                                chunk.len()
+                            );
+                            if tx.send(EncodedChunk { data: chunk, rows }).await.is_err() {
+                                println!("Consumer dropped, cancelling query");
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Stream error: {e}");
+                            break;
+                        }
+                    }
+                }
+
+                if let Err(e) = encoder.finish() {
+                    eprintln!("Finish error: {e}");
+                    return;
+                }
+                let footer = encoder.drain();
+                let _ = tx
+                    .send(EncodedChunk {
+                        data: footer,
+                        rows: 0,
+                    })
+                    .await;
+                println!("Query encoding complete: {batch_count} batches");
+            });
 
             let mut batch_count = 0usize;
             let mut total_rows = 0usize;
-            let mut total_bytes = header.len();
+            let mut total_bytes = 0usize;
             let mut cancelled = false;
 
             loop {
                 tokio::select! {
-                    batch_result = stream.try_next() => {
-                        match batch_result? {
-                            Some(batch) => {
-                                let rows = batch.num_rows();
-                                encoder.write_batch(&batch)?;
-                                let chunk = encoder.drain();
-                                send.write_all(&chunk).await?;
-
-                                batch_count += 1;
-                                total_rows += rows;
-                                total_bytes += chunk.len();
-                                println!(
-                                    "Sent batch {} ({} rows, {} bytes)",
-                                    batch_count, rows, chunk.len()
-                                );
-
-                                send_progress(&connection, total_rows, batch_count, total_bytes);
+                    chunk = rx.recv() => {
+                        match chunk {
+                            Some(c) => {
+                                send.write_all(&c.data).await?;
+                                total_bytes += c.data.len();
+                                if c.rows > 0 {
+                                    batch_count += 1;
+                                    total_rows += c.rows;
+                                    println!(
+                                        "Sent batch {batch_count} ({} rows, {} bytes)",
+                                        c.rows, c.data.len()
+                                    );
+                                    send_progress(
+                                        &connection, total_rows, batch_count, total_bytes,
+                                    );
+                                }
                             }
                             None => break,
                         }
@@ -102,21 +158,12 @@ pub async fn handle_session(
                 }
             }
 
-            encoder.finish()?;
-            let footer = encoder.drain();
-            send.write_all(&footer).await?;
             send.finish().await?;
 
             if cancelled {
-                println!(
-                    "Query cancelled after {} batches, {} total rows",
-                    batch_count, total_rows
-                );
+                println!("Query cancelled after {batch_count} batches, {total_rows} total rows",);
             } else {
-                println!(
-                    "Query complete: {} batches, {} total rows",
-                    batch_count, total_rows
-                );
+                println!("Query complete: {batch_count} batches, {total_rows} total rows",);
             }
         }
         Err(e) => eprintln!("Error accepting stream: {}", e),
