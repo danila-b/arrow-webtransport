@@ -11,10 +11,13 @@ This project explores **browser-native, high-performance analytics streaming** b
 
 The thesis question is: *can a browser receive analytical query results as a stream of Arrow record batches with better latency and interactivity than “traditional web” approaches (HTTP fetch / WebSocket), and how do QUIC streams + datagrams change the UX model?*
 
-This repo intentionally contains **two comparable paths**:
+This repo contains **three comparable transport paths**, served by separate server binaries sharing a common core, and a **single unified client** that can switch between them:
 
-- `http2-fetch/` — a baseline using HTTP/2 + Fetch streaming semantics
-- `webtransport/` — the experimental path using WebTransport (HTTP/3) streams + datagrams
+- **WebTransport** (`servers/webtransport/`, port 4433) — Arrow IPC over QUIC bidirectional streams + datagrams for progress/cancel
+- **HTTP/2 Arrow** (`servers/http2-arrow/`, port 3000) — Arrow IPC streaming over HTTP POST, cancel via `AbortController`
+- **HTTP/2 JSON** (`servers/http2-json/`, port 3001) — traditional JSON-over-HTTP baseline (DataFusion → JSON serialization)
+
+Shared query execution and Arrow encoding live in `server-core/`. The unified client (`client/`) uses a transport picker UI so all three paths can be compared in the same environment.
 
 The code is designed to stay simple enough for an MVP, but structured so it can grow into a thesis-quality prototype with clear evaluation hooks.
 
@@ -145,23 +148,18 @@ The thesis can explicitly treat each added protocol feature as an experiment:
 
 ## 7. Server internal architecture (Rust)
 
-### 7.1 Modules (target shape)
+### 7.1 Modules (current shape)
 
-Both servers (`http2-fetch/server` and `webtransport/server`) should converge on similar internal boundaries:
+Shared logic lives in `server-core/` (a Cargo workspace member used by all three server binaries):
 
-- `query/`
-  - parse/validate request
-  - build DataFusion logical plan
-  - run `execute_stream()` and yield `RecordBatch` stream
-- `arrow_stream/`
-  - encode Arrow IPC stream and write incrementally
-  - handle backpressure (as best as possible)
-- `control/`
-  - progress accounting
-  - cancellation token + query lifecycle
-- `transport/`
-  - HTTP/2 fetch handler OR WebTransport session handler
-  - maps transport primitives → data plane + control plane abstraction
+- `server-core/query.rs` — DataFusion `SessionContext` creation, parquet table registration
+- `server-core/encode.rs` — incremental Arrow IPC `StreamEncoder` with drainable buffer
+
+Each server binary owns only its transport layer:
+
+- `servers/webtransport/` — wtransport session handling, bidirectional streams, datagrams
+- `servers/http2-arrow/` — Axum POST handler, streaming `Body` response
+- `servers/http2-json/` — Axum POST handler, JSON array response
 
 ### 7.2 Query execution contract
 
@@ -193,12 +191,14 @@ This keeps the code understandable while still demonstrating streaming behavior.
 
 ### 8.1 UI and behavior
 
-Minimal UI:
+A single unified client (`client/`) with:
+- Transport picker (radio buttons): WebTransport / HTTP/2 Arrow / HTTP/2 JSON
 - SQL textarea
 - Run button
 - Cancel button
-- progress indicator
+- progress indicator (WebTransport only — has out-of-band datagrams)
 - table preview (first N rows) + row count
+- stats panel (TTFB, throughput, cancel latency, long tasks)
 
 ### 8.2 Streaming decode pipeline
 

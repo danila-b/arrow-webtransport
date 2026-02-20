@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "server-core",
+    "servers/webtransport",
+    "servers/http2-arrow",
+    "servers/http2-json",
+]
+resolver = "2"
