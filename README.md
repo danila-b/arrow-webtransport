@@ -28,7 +28,7 @@ Verify the Parquet files exist in `data/nyc_yellow_taxi_dataset/`.
 
 - Rust toolchain (install via [rustup](https://rustup.rs/))
 - Node.js >= 18 and npm
-- [`just`](https://github.com/casey/just) command runner (recommended)
+- [`just`](https://github.com/casey/just) command runner 
 - A Chromium-based browser (required for WebTransport)
 
 
@@ -48,6 +48,9 @@ just servers
 just servers webtransport
 just servers http2-arrow http2-json
 ```
+
+>[!NOTE]
+> First time running the servers, the server will generate the TLS certificates. This may take a few seconds and likely will prompt you to trust the certificate.
 
 ## Notes
 
