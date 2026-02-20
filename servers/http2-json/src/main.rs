@@ -6,8 +6,8 @@ use axum::http::{HeaderValue, Method, header};
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
-use server_core::datafusion::prelude::SessionContext;
 use serde::Deserialize;
+use server_core::datafusion::prelude::SessionContext;
 use tower_http::cors::CorsLayer;
 
 #[derive(Clone)]
@@ -27,11 +27,9 @@ async fn query_endpoint(
     println!("Received query: {}", req.sql);
 
     match execute_json(&state.ctx, &req.sql).await {
-        Ok(json_bytes) => (
-            [(header::CONTENT_TYPE, "application/json")],
-            json_bytes,
-        )
-            .into_response(),
+        Ok(json_bytes) => {
+            ([(header::CONTENT_TYPE, "application/json")], json_bytes).into_response()
+        }
         Err(e) => {
             let msg = format!("Query error: {e}");
             eprintln!("{msg}");
@@ -50,7 +48,11 @@ async fn execute_json(ctx: &SessionContext, sql: &str) -> anyhow::Result<Vec<u8>
     let batches = df.collect().await?;
 
     let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
-    println!("Query returned {} batches, {} total rows", batches.len(), total_rows);
+    println!(
+        "Query returned {} batches, {} total rows",
+        batches.len(),
+        total_rows
+    );
 
     let mut buf = Vec::new();
     let mut writer = arrow_json::ArrayWriter::new(&mut buf);

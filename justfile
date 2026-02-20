@@ -38,4 +38,4 @@ servers *names:
 lint:
     cargo fmt --check
     cargo clippy
-    cd client && npm run lint
+    cd client && npm run lint:fix

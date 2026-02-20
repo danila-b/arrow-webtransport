@@ -80,10 +80,7 @@ async fn generate_and_save_identity(
         .store_secret_pemfile(key_path)
         .await?;
 
-    println!(
-        "Generated new self-signed certificate in {}",
-        dir.display()
-    );
+    println!("Generated new self-signed certificate in {}", dir.display());
     Ok(identity)
 }
 

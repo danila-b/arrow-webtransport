@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use server_core::datafusion::prelude::SessionContext;
 use futures::TryStreamExt;
+use server_core::datafusion::prelude::SessionContext;
 use server_core::encode::StreamEncoder;
 use wtransport::Connection;
 

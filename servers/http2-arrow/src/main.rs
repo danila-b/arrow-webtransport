@@ -7,9 +7,9 @@ use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
 use bytes::Bytes;
-use server_core::datafusion::prelude::SessionContext;
 use futures::TryStreamExt;
 use serde::Deserialize;
+use server_core::datafusion::prelude::SessionContext;
 use server_core::encode::StreamEncoder;
 use tower_http::cors::CorsLayer;
 
@@ -44,10 +44,7 @@ async fn query_endpoint(
     };
 
     (
-        [(
-            header::CONTENT_TYPE,
-            "application/vnd.apache.arrow.stream",
-        )],
+        [(header::CONTENT_TYPE, "application/vnd.apache.arrow.stream")],
         body,
     )
         .into_response()
