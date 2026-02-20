@@ -34,6 +34,17 @@ servers *names:
     fi
     wait
 
+# Run all tests (Rust + client)
+test: test-server test-client
+
+# Run Rust server tests
+test-server:
+    cargo test
+
+# Run client tests
+test-client:
+    cd client && npm test
+
 # Lint the whole repo (Rust + TypeScript)
 lint:
     cargo fmt --check
