@@ -1,0 +1,41 @@
+x-server-common: &server-common
+  build: .
+  entrypoint: ["/app/entrypoint.sh"]
+  cap_add: [NET_ADMIN]
+  volumes:
+    - ./data:/app/data:ro
+    - ./certs:/app/certs
+    - ./bench/entrypoint.sh:/app/entrypoint.sh:ro
+  networks: [bench-net]
+  environment:
+    NETEM_PARAMS: ${NETEM_PARAMS:-}
+
+services:
+  webtransport:
+    <<: *server-common
+    command: ["server-webtransport"]
+    ports:
+      - "4433:4433/udp"
+      - "4433:4433/tcp"
+
+  http2-arrow:
+    <<: *server-common
+    command: ["server-http2-arrow"]
+    ports:
+      - "3000:3000"
+    environment:
+      NETEM_PARAMS: ${NETEM_PARAMS:-}
+      BIND_ADDR: "0.0.0.0:3000"
+
+  http2-json:
+    <<: *server-common
+    command: ["server-http2-json"]
+    ports:
+      - "3001:3001"
+    environment:
+      NETEM_PARAMS: ${NETEM_PARAMS:-}
+      BIND_ADDR: "0.0.0.0:3001"
+
+networks:
+  bench-net:
+    driver: bridge

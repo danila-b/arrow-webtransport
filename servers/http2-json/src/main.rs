@@ -66,6 +66,10 @@ async fn execute_json(ctx: &SessionContext, sql: &str) -> anyhow::Result<Vec<u8>
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     let ctx = Arc::new(server_core::query::create_context().await?);
 
     let cors = CorsLayer::new()
@@ -80,7 +84,9 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state)
         .layer(cors);
 
-    let addr: SocketAddr = "127.0.0.1:3001".parse().unwrap();
+    let addr: SocketAddr = std::env::var("BIND_ADDR")
+        .unwrap_or_else(|_| "127.0.0.1:3001".into())
+        .parse()?;
     let (cert_path, key_path) = server_core::certs::ensure_certs()?;
     let tls_config =
         axum_server::tls_rustls::RustlsConfig::from_pem_file(cert_path, key_path).await?;

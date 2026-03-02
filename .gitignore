@@ -58,3 +58,4 @@ lerna-debug.log*
 
 AGENTS.local.md 
 CLAUDE.local.md
+.cursor/

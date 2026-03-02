@@ -15,3 +15,4 @@ bytes = "1"
 tokio-stream = "0.1"
 anyhow = "1"
 axum-server = { version = "0.7", features = ["tls-rustls"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }

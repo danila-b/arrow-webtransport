@@ -1,0 +1,10 @@
+target/
+data/
+certs/
+client/
+node_modules/
+bench/
+docs/
+.git/
+.vscode/
+*.md

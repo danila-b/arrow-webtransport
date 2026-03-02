@@ -45,6 +45,17 @@ test-server:
 test-client:
     cd client && npm test
 
+# Run servers in Docker with network emulation. Profile: lan
+bench-net profile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{profile}}" in
+        lan) params="delay 0.5ms" ;;
+        *) echo "Unknown profile: {{profile}}. Available: lan"; exit 1 ;;
+    esac
+    echo "Starting servers with network profile '{{profile}}': netem $params"
+    NETEM_PARAMS="$params" docker compose up --build
+
 # Lint the whole repo (Rust + TypeScript)
 lint:
     cargo fmt --check

@@ -75,7 +75,26 @@ Lint the entire repo (Rust + TypeScript) in one command:
 just lint
 ```
 
+## Network emulation
 
+Run the servers inside Docker with `tc netem` network shaping to test under degraded conditions.
+Requires docker compose to be installed with any conteinerization engine. 
 
+### Usage
 
+```sh
+just bench-net lan
+```
+
+This builds the server images, starts all three servers in Docker containers with the `lan` network profile (1ms RTT), and applies `tc netem` shaping on each container's network interface.
+
+Once the servers are running, start the client dev server separately:
+
+```sh
+just client
+```
+
+Then open `https://localhost:5173` in Chrome and use the transport picker to run queries against the containerized servers. The ports (4433, 3000, 3001) are the same as in local development.
+
+Available profiles: `lan`. Additional profiles with bandwidth limits and packet loss will be added in future work.
 
