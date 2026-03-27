@@ -1,75 +1,72 @@
 # Browser-native analytics streaming (Arrow + WebTransport)
 
-This repo is a thesis prototype exploring **streaming analytical query results directly into the browser** using:
+This repository contains a thesis prototype for comparing three ways to deliver analytical query results to the browser:
 
-- **Apache Arrow IPC stream** — efficient columnar format used on the wire
-- **Rust + DataFusion** for query execution on the server
-- Three transport paths, each running as a separate server binary:
-  - **WebTransport** (`servers/webtransport/`, port 4433) — Arrow IPC over QUIC streams + datagrams for progress/cancel
-  - **HTTP/2 Arrow** (`servers/http2-arrow/`, port 3000) — Arrow IPC streaming over HTTP POST
-  - **HTTP/2 JSON** (`servers/http2-json/`, port 3001) — traditional JSON-over-HTTP baseline
-- A **single unified client** (`client/`) with a transport picker to switch between all three
+- WebTransport + Arrow IPC
+- HTTP/2 + Arrow IPC
+- HTTP/2 + JSON
 
-Shared query execution and Arrow encoding live in `server-core/`. The client uses the same rendering and stats pipeline regardless of transport.
+The server side is built in Rust with DataFusion. The browser client is a single TypeScript app that can switch between all three transports and render results through the same UI.
 
-## How to clone
+For deeper project context, see `docs/project-tracker.md` for current status, `docs/thesis-one-pager.md` for the concise thesis summary, and `docs/thesis-research.md` for the research-oriented outline.
 
-This repository uses Git LFS to manage large Parquet dataset files. Install Git LFS first: https://git-lfs.github.com/
+## Clone
+
+This repository uses Git LFS for the Parquet dataset files. Install [Git LFS](https://git-lfs.github.com/) first.
 
 ```sh
 git clone git@github.com:danila-b/arrow-webtransport.git
 ```
 
-Verify the Parquet files exist in `data/nyc_yellow_taxi_dataset/`.
+After cloning, verify that the Parquet files exist in `data/nyc_yellow_taxi_dataset/`.
 
-## How to run
+## Prerequisites
 
-### Prerequisites
+- Rust toolchain via [rustup](https://rustup.rs/)
+- Node.js 18+ and npm
+- [`just`](https://github.com/casey/just)
+- Chromium-based browser for WebTransport testing
 
-- Rust toolchain (install via [rustup](https://rustup.rs/))
-- Node.js >= 18 and npm
-- [`just`](https://github.com/casey/just) command runner 
-- A Chromium-based browser (required for WebTransport)
-
-
-### Quick start 
+## Quick start
 
 ```sh
-# Everything — all three servers + client dev server (Ctrl+C stops all)
+# Everything: all servers + client dev server
 just dev
 
-# Only the client dev server
+# Client only
 just client
 
-# All servers (no client)
+# All servers only
 just servers
 
-# Specific server(s)
+# Specific servers
 just servers webtransport
 just servers http2-arrow http2-json
 ```
 
->[!NOTE]
-> First time running the servers, the server will generate the TLS certificates. This may take a few seconds and likely will prompt you to trust the certificate.
+> [!NOTE]
+> On the first run, the servers generate local TLS certificates. This can take a few seconds and may prompt you to trust the certificate.
 
-## Notes
+## What runs where
 
-- Tested on Chrome. WebTransport requires a Chromium-based browser.
-- This is a research prototype: the goal is reliable experiments and measurements, not a production service.
+- `servers/webtransport/` on port `4433`
+- `servers/http2-arrow/` on port `3000`
+- `servers/http2-json/` on port `3001`
+- `client/` on `https://localhost:5173`
 
-## Running tests
+Shared query execution and Arrow encoding live in `server-core/`.
+
+## Tests
 
 ```sh
-# Rust tests (all server crates)
+# Rust tests
 cargo test
 
 # Client tests
 cd client && npm test
 ```
 
-## Linting
-
-Lint the entire repo (Rust + TypeScript) in one command:
+## Lint
 
 ```sh
 just lint
@@ -77,24 +74,24 @@ just lint
 
 ## Network emulation
 
-Run the servers inside Docker with `tc netem` network shaping to test under degraded conditions.
-Requires docker compose to be installed with any conteinerization engine. 
-
-### Usage
+The repository includes a Docker-based network-emulation workflow using `tc netem`.
 
 ```sh
 just bench-net lan
 ```
 
-This builds the server images, starts all three servers in Docker containers with the `lan` network profile (1ms RTT), and applies `tc netem` shaping on each container's network interface.
-
-Once the servers are running, start the client dev server separately:
+This starts the servers in containers with the `lan` profile and applies shaping to each container interface. Then start the client separately:
 
 ```sh
 just client
 ```
 
-Then open `https://localhost:5173` in Chrome and use the transport picker to run queries against the containerized servers. The ports (4433, 3000, 3001) are the same as in local development.
+Open `https://localhost:5173` in Chrome and run queries against the containerized servers.
 
-Available profiles: `lan`. Additional profiles with bandwidth limits and packet loss will be added in future work.
+At the moment, `lan` is the documented profile available in the repo workflow. Additional profiles are planned as part of the thesis evaluation work.
+
+## Notes
+
+- Tested in Chrome; WebTransport support is treated as Chromium-focused in this prototype.
+- This is a research prototype meant for experiments and comparison, not a production deployment.
 
