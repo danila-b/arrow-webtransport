@@ -40,9 +40,7 @@ pub async fn handle_session(
     Ok(())
 }
 
-async fn accept_connection(
-    incoming: wtransport::endpoint::IncomingSession,
-) -> Result<Connection> {
+async fn accept_connection(incoming: wtransport::endpoint::IncomingSession) -> Result<Connection> {
     let request = incoming.await?;
     println!("New session request from: {:?}", request.authority());
     let connection = request.accept().await?;
@@ -59,12 +57,12 @@ async fn read_query(mut recv: wtransport::RecvStream) -> Result<String> {
     Ok(String::from_utf8(query_bytes)?)
 }
 
-async fn execute_query(
-    ctx: &SessionContext,
-    query: &str,
-) -> Result<SendableRecordBatchStream> {
+async fn execute_query(ctx: &SessionContext, query: &str) -> Result<SendableRecordBatchStream> {
     let df = ctx.sql(query).await.context("query planning failed")?;
-    let stream = df.execute_stream().await.context("query execution failed")?;
+    let stream = df
+        .execute_stream()
+        .await
+        .context("query execution failed")?;
     Ok(stream)
 }
 
@@ -175,7 +173,9 @@ async fn stream_results(
     if cancelled {
         println!("Query cancelled after {batch_count} batches, {total_rows} total rows");
     } else {
-        println!("Query complete: {batch_count} batches, {total_rows} total rows, {total_bytes} bytes");
+        println!(
+            "Query complete: {batch_count} batches, {total_rows} total rows, {total_bytes} bytes"
+        );
     }
 
     Ok(())

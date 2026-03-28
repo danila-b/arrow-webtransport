@@ -6,7 +6,7 @@ use std::path::PathBuf;
 const TAXI_TABLE_NAME: &str = "yellow_taxi";
 
 fn taxi_dataset_dir() -> PathBuf {
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     workspace_root.join("data").join("nyc_yellow_taxi_dataset")
 }
 

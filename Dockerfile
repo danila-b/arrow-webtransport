@@ -2,8 +2,8 @@ FROM rust:bookworm AS builder
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
-COPY server-core/ server-core/
-COPY servers/ servers/
+COPY src/server-core/ src/server-core/
+COPY src/servers/ src/servers/
 
 RUN cargo build --release \
     --package server-webtransport \
@@ -22,4 +22,4 @@ COPY --from=builder /app/target/release/server-http2-arrow  /usr/local/bin/
 COPY --from=builder /app/target/release/server-http2-json   /usr/local/bin/
 COPY --from=builder /app/target/release/gen-certs           /usr/local/bin/
 
-RUN mkdir -p /app/server-core /app/data /app/certs
+RUN mkdir -p /app/data /app/certs

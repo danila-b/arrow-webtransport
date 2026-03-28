@@ -51,12 +51,12 @@ just servers http2-arrow http2-json
 
 ## What runs where
 
-- `servers/webtransport/` on port `4433`
-- `servers/http2-arrow/` on port `3000`
-- `servers/http2-json/` on port `3001`
-- `client/` on `https://localhost:5173`
+- `src/servers/webtransport/` on port `4433`
+- `src/servers/http2-arrow/` on port `3000`
+- `src/servers/http2-json/` on port `3001`
+- `src/client/` on `https://localhost:5173`
 
-Shared query execution and Arrow encoding live in `server-core/`.
+Shared query execution and Arrow encoding live in `src/server-core/`.
 
 ## Tests
 

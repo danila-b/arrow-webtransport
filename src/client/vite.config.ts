@@ -9,7 +9,7 @@ import mkcert from 'vite-plugin-mkcert';
  * on every request so the client always picks up the latest hash.
  */
 function certHashPlugin(): Plugin {
-  const certsDir = path.resolve(__dirname, '../certs');
+  const certsDir = path.resolve(__dirname, '../../certs');
 
   return {
     name: 'serve-cert-hash',

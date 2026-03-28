@@ -11,12 +11,12 @@ dev: gen-certs
     cargo run -p server-webtransport &
     cargo run -p server-http2-arrow &
     cargo run -p server-http2-json &
-    cd client && npm run dev &
+    cd src/client && npm run dev &
     wait
 
 # Run only the client dev server
 client:
-    cd client && npm run dev
+    cd src/client && npm run dev
 
 # Run servers (default: all). Specify names: just servers webtransport http2-arrow
 servers *names: gen-certs
@@ -47,7 +47,7 @@ test-server:
 
 # Run client tests
 test-client:
-    cd client && npm test
+    cd src/client && npm test
 
 # Run servers in Docker with network emulation. Profiles: lan, broadband, wan, mobile, lossy
 bench-net profile: gen-certs
@@ -76,6 +76,6 @@ bench-net-list:
 
 # Lint the whole repo (Rust + TypeScript)
 lint:
-    cargo fmt --check
+    cargo fmt
     cargo clippy
-    cd client && npm run lint:fix
+    cd src/client && npm run lint:fix

@@ -165,9 +165,7 @@ export class WebTransportAdapter implements QueryTransport {
         this.certHash = await loadCertHash();
       }
       const transport = new WebTransport(WT_SERVER_URL, {
-        serverCertificateHashes: [
-          { algorithm: 'sha-256', value: this.certHash.buffer as ArrayBuffer },
-        ],
+        serverCertificateHashes: [{ algorithm: 'sha-256', value: this.certHash.buffer as ArrayBuffer }],
       });
       await transport.ready;
       this.transport = transport;

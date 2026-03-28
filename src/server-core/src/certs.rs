@@ -12,7 +12,7 @@ pub const CERT_MAX_AGE: Duration = Duration::from_secs(13 * 24 * 3600);
 
 pub fn certs_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
+        .join("../..")
         .join("certs")
 }
 
@@ -67,8 +67,7 @@ fn generate_and_save(
             std::net::Ipv4Addr::LOCALHOST,
         )));
     params.not_before = OffsetDateTime::now_utc();
-    params.not_after =
-        OffsetDateTime::now_utc() + time::Duration::days(CERT_VALIDITY_DAYS);
+    params.not_after = OffsetDateTime::now_utc() + time::Duration::days(CERT_VALIDITY_DAYS);
 
     let key_pair = rcgen::KeyPair::generate()?;
     let cert = params.self_signed(&key_pair)?;

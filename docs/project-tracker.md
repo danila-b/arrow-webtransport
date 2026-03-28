@@ -6,11 +6,11 @@ This file is the living status document for the prototype and thesis work. It tr
 
 The repository currently contains a working prototype for comparing three browser-facing transport paths for analytical query results:
 
-- `servers/webtransport/`: WebTransport over QUIC with Arrow IPC streaming and datagrams for progress and cancel
-- `servers/http2-arrow/`: HTTP/2 streaming response with Arrow IPC
-- `servers/http2-json/`: HTTP/2 JSON baseline with full result materialization
-- `server-core/`: shared query execution, Arrow encoding, and certificate support
-- `client/`: one browser client with a transport picker and shared rendering/stats pipeline
+- `src/servers/webtransport/`: WebTransport over QUIC with Arrow IPC streaming and datagrams for progress and cancel
+- `src/servers/http2-arrow/`: HTTP/2 streaming response with Arrow IPC
+- `src/servers/http2-json/`: HTTP/2 JSON baseline with full result materialization
+- `src/server-core/`: shared query execution, Arrow encoding, and certificate support
+- `src/client/`: one browser client with a transport picker and shared rendering/stats pipeline
 
 The prototype is already suitable for manual comparison runs in Chrome. It is not yet a full experiment harness.
 
@@ -95,7 +95,7 @@ Explore stretch improvements such as richer query envelopes, multiple queries pe
 - Overhauled TLS certificate generation to fix WebTransport handshake failures.
   - Set explicit 14-day validity on generated certificates (WebTransport spec maximum); rcgen previously defaulted to multi-thousand-year validity which Chrome rejects.
   - Moved cert generation to a dedicated `gen-certs` binary run as a `just` dependency before any server starts, eliminating race conditions from parallel server startup.
-  - Certificate hash (`cert-hash.json`) is now written atomically alongside PEM files during generation in `server-core`, removing the WebTransport server's responsibility for hash computation.
+  - Certificate hash (`cert-hash.json`) is now written atomically alongside PEM files during generation in `src/server-core`, removing the WebTransport server's responsibility for hash computation.
   - Added `gen-certs` init container in Docker Compose so containerized servers also avoid races.
   - Client now clears cached certificate hash on connection failure so retries pick up refreshed certs.
 - Expanded network emulation from one profile (`lan`) to five: `lan`, `broadband`, `wan`, `mobile`, and `lossy`.

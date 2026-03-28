@@ -1,7 +1,7 @@
 target/
 data/
 certs/
-client/
+src/client/
 node_modules/
 bench/
 docs/
