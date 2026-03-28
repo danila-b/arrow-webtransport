@@ -22,4 +22,4 @@ COPY --from=builder /app/target/release/server-http2-arrow  /usr/local/bin/
 COPY --from=builder /app/target/release/server-http2-json   /usr/local/bin/
 COPY --from=builder /app/target/release/gen-certs           /usr/local/bin/
 
-RUN mkdir -p /app/data /app/certs
+RUN mkdir -p /app/src/server-core /app/data /app/certs
