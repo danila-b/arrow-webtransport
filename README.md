@@ -45,7 +45,9 @@ just servers http2-arrow http2-json
 ```
 
 > [!NOTE]
-> On the first run, the servers generate local TLS certificates. This can take a few seconds and may prompt you to trust the certificate.
+> TLS certificates are generated automatically before server startup via `just gen-certs` (called as a dependency of `dev`, `servers`, and `bench-net`).
+> Self-signed certs are valid for 14 days per the WebTransport spec and auto-refresh on the next run. QUIC enforces TLS, so all servers use it for equality of comparison.
+> Run `just gen-certs` standalone to force-refresh certificates.
 
 ## What runs where
 
@@ -74,13 +76,13 @@ just lint
 
 ## Network emulation
 
-The repository includes a Docker-based network-emulation workflow using `tc netem`.
+The repository includes a Docker-based network-emulation workflow using `tc netem`. Each profile applies shaping inside every server container on `eth0` (server-egress direction).
 
 ```sh
-just bench-net lan
+just bench-net <profile>
 ```
 
-This starts the servers in containers with the `lan` profile and applies shaping to each container interface. Then start the client separately:
+Then start the client separately:
 
 ```sh
 just client
@@ -88,7 +90,23 @@ just client
 
 Open `https://localhost:5173` in Chrome and run queries against the containerized servers.
 
-At the moment, `lan` is the documented profile available in the repo workflow. Additional profiles are planned as part of the thesis evaluation work.
+### Available profiles
+
+| Profile | `tc netem` parameters | Models |
+|---------|-----------------------|--------|
+| `lan` | `delay 0.5ms` | Near-zero-latency local network |
+| `broadband` | `delay 10ms rate 100mbit` | Healthy fixed-access link |
+| `wan` | `delay 40ms rate 30mbit` | Cross-region or backbone path |
+| `mobile` | `delay 80ms 20ms distribution normal rate 10mbit loss 0.5%` | Constrained mobile link with jitter and mild loss |
+| `lossy` | `delay 40ms rate 30mbit loss 2%` | Moderate-latency link with significant packet loss |
+
+To list all profiles and their parameters without starting containers:
+
+```sh
+just bench-net-list
+```
+
+Container startup logs print the applied `tc netem` string so you can confirm which profile is active.
 
 ## Notes
 

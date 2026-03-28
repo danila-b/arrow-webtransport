@@ -25,7 +25,7 @@ The prototype is already suitable for manual comparison runs in Chrome. It is no
 - Streaming table rendering for Arrow-based paths
 - Cancellation support on all transports
 - WebTransport progress updates over datagrams
-- Local TLS certificate generation for development
+- Local TLS certificate generation with spec-compliant 14-day validity and race-free startup
 
 ### Current measurements available in the client
 
@@ -49,13 +49,13 @@ These are the metrics implemented today. Additional metrics for the thesis study
 - Clear comparison target: WebTransport vs HTTP/2 Arrow vs HTTP/2 JSON
 - Core thesis angle established: separate data plane and control plane in the browser
 - Initial evaluation framing defined around latency, throughput, cancellation, and perceived interactivity
-- Network emulation path exists through Docker-based setup, currently documented for the `lan` profile
+- Network emulation via Docker and `tc netem` with five named profiles: `lan`, `broadband`, `wan`, `mobile`, and `lossy`
 
 ## Current limitations and open risks
 
 - WebTransport support is effectively Chromium-only for this prototype
 - The benchmark workflow is still mostly manual; there is no automated experiment runner yet
-- Only the `lan` network profile is documented as available today in the repo workflow
+- Network emulation shapes server egress only; symmetric RTT modeling would require an IFB or router-sidecar topology
 - Some thesis metrics are still target-study metrics rather than implemented instrumentation
 - Backpressure and QUIC flow-control behavior under slower clients still need more systematic testing
 - The JSON baseline is intentionally non-streaming, so it is useful for comparison but not feature-parity
@@ -72,9 +72,9 @@ Define a shared set of analytical queries that vary by result size and schema sh
 
 Add server-side timing, batch counts, and byte counters so client-side observations can be cross-checked against server execution behavior.
 
-### 3. Expanded network emulation profiles
+### 3. ~~Expanded network emulation profiles~~ (done)
 
-Extend network shaping beyond `lan` to a stable set of named profiles such as broadband, WAN, mobile, and lossy links.
+Five named profiles are now available via `just bench-net <profile>`: `lan`, `broadband`, `wan`, `mobile`, and `lossy`. See README for the full parameter table.
 
 ### 4. Automated experiment runner
 
@@ -89,6 +89,19 @@ Turn raw benchmark output into thesis-ready tables, charts, and statistical summ
 Explore stretch improvements such as richer query envelopes, multiple queries per WebTransport session, or richer control signaling.
 
 ## Technical log
+
+### 2026-03-28
+
+- Overhauled TLS certificate generation to fix WebTransport handshake failures.
+  - Set explicit 14-day validity on generated certificates (WebTransport spec maximum); rcgen previously defaulted to multi-thousand-year validity which Chrome rejects.
+  - Moved cert generation to a dedicated `gen-certs` binary run as a `just` dependency before any server starts, eliminating race conditions from parallel server startup.
+  - Certificate hash (`cert-hash.json`) is now written atomically alongside PEM files during generation in `server-core`, removing the WebTransport server's responsibility for hash computation.
+  - Added `gen-certs` init container in Docker Compose so containerized servers also avoid races.
+  - Client now clears cached certificate hash on connection failure so retries pick up refreshed certs.
+- Expanded network emulation from one profile (`lan`) to five: `lan`, `broadband`, `wan`, `mobile`, and `lossy`.
+- Each profile maps to a single `tc netem` parameter string passed via `NETEM_PARAMS`.
+- Added `just bench-net-list` helper recipe for quick reference.
+- Documented the egress-only shaping caveat as a known methodological limitation.
 
 ### 2026-03-27
 

@@ -11,12 +11,20 @@ x-server-common: &server-common
     NETEM_PARAMS: ${NETEM_PARAMS:-}
 
 services:
+  gen-certs:
+    <<: *server-common
+    command: ["gen-certs"]
+    restart: "no"
+
   webtransport:
     <<: *server-common
     command: ["server-webtransport"]
     ports:
       - "4433:4433/udp"
       - "4433:4433/tcp"
+    depends_on:
+      gen-certs:
+        condition: service_completed_successfully
 
   http2-arrow:
     <<: *server-common
@@ -26,6 +34,9 @@ services:
     environment:
       NETEM_PARAMS: ${NETEM_PARAMS:-}
       BIND_ADDR: "0.0.0.0:3000"
+    depends_on:
+      gen-certs:
+        condition: service_completed_successfully
 
   http2-json:
     <<: *server-common
@@ -35,6 +46,9 @@ services:
     environment:
       NETEM_PARAMS: ${NETEM_PARAMS:-}
       BIND_ADDR: "0.0.0.0:3001"
+    depends_on:
+      gen-certs:
+        condition: service_completed_successfully
 
 networks:
   bench-net:

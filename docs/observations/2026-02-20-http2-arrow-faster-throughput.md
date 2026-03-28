@@ -1,4 +1,4 @@
-# Observation: HTTP/2 Arrow has ~10× higher throughput than WebTransport
+# Observation: HTTP/2 Arrow has ~10× higher throughput than WebTransport on localhost network
 
 **Date:** 2026-02-20
 **Query:** `SELECT * FROM yellow_taxi LIMIT 1000000`

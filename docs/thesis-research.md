@@ -174,15 +174,17 @@ Some of these are already present in the prototype. Others belong to the planned
 
 ### 9.4 Network emulation
 
-Controlled impairment is an important part of the methodology. The plan is to use `tc netem` through a reproducible containerized setup so the same transport comparison can be repeated under:
+Controlled impairment is an important part of the methodology. The repository uses `tc netem` inside Docker containers to shape server-egress traffic under five named profiles:
 
-- low latency with minimal loss
-- moderate latency and bandwidth limits
-- higher-latency WAN-style conditions
-- mobile-like conditions
-- explicit packet-loss scenarios
+| Profile | `tc netem` parameters | Models |
+|---------|-----------------------|--------|
+| `lan` | `delay 0.5ms` | Near-zero-latency local network |
+| `broadband` | `delay 10ms rate 100mbit` | Healthy fixed-access link |
+| `wan` | `delay 40ms rate 30mbit` | Cross-region or backbone path |
+| `mobile` | `delay 80ms 20ms distribution normal rate 10mbit loss 0.5%` | Constrained mobile link with jitter and mild loss |
+| `lossy` | `delay 40ms rate 30mbit loss 2%` | Moderate-latency link with significant packet loss |
 
-At the moment, the repository documents the `lan` profile as the implemented baseline. Broader profile coverage is still planned work.
+The profiles intentionally separate impairment dimensions (latency, bandwidth, jitter, loss) so that each transport-level effect can be attributed more clearly. Shaping is currently applied on server egress only; symmetric RTT modeling would require an IFB or router-sidecar topology.
 
 ---
 

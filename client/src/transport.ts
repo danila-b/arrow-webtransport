@@ -160,14 +160,21 @@ export class WebTransportAdapter implements QueryTransport {
   private datagramListener: DatagramListener | null = null;
 
   async connect(): Promise<void> {
-    if (!this.certHash) {
-      this.certHash = await loadCertHash();
+    try {
+      if (!this.certHash) {
+        this.certHash = await loadCertHash();
+      }
+      const transport = new WebTransport(WT_SERVER_URL, {
+        serverCertificateHashes: [
+          { algorithm: 'sha-256', value: this.certHash.buffer as ArrayBuffer },
+        ],
+      });
+      await transport.ready;
+      this.transport = transport;
+    } catch (err) {
+      this.certHash = null;
+      throw err;
     }
-    const transport = new WebTransport(WT_SERVER_URL, {
-      serverCertificateHashes: [{ algorithm: 'sha-256', value: this.certHash.buffer as ArrayBuffer }],
-    });
-    await transport.ready;
-    this.transport = transport;
   }
 
   async executeQuery(sql: string, callbacks: TransportCallbacks): Promise<TransportResult> {

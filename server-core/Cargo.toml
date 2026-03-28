@@ -11,6 +11,12 @@ futures = "0.3"
 serde_json = "1"
 anyhow = "1"
 rcgen = "0.13"
+sha2 = "0.10"
+time = "0.3"
+
+[[bin]]
+name = "gen-certs"
+path = "src/bin/gen_certs.rs"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

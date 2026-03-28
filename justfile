@@ -1,7 +1,11 @@
 set shell := ["bash", "-c"]
 
+# Generate or refresh TLS certificates (runs before any server starts)
+gen-certs:
+    cargo run -p server-core --bin gen-certs
+
 # Run all servers and the client dev server
-dev:
+dev: gen-certs
     #!/usr/bin/env bash
     trap 'kill 0' SIGINT SIGTERM
     cargo run -p server-webtransport &
@@ -15,7 +19,7 @@ client:
     cd client && npm run dev
 
 # Run servers (default: all). Specify names: just servers webtransport http2-arrow
-servers *names:
+servers *names: gen-certs
     #!/usr/bin/env bash
     trap 'kill 0' SIGINT SIGTERM
     if [ -z "{{names}}" ]; then
@@ -45,16 +49,30 @@ test-server:
 test-client:
     cd client && npm test
 
-# Run servers in Docker with network emulation. Profile: lan
-bench-net profile:
+# Run servers in Docker with network emulation. Profiles: lan, broadband, wan, mobile, lossy
+bench-net profile: gen-certs
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{profile}}" in
-        lan) params="delay 0.5ms" ;;
-        *) echo "Unknown profile: {{profile}}. Available: lan"; exit 1 ;;
+        lan)       params="delay 0.5ms" ;;
+        broadband) params="delay 10ms rate 100mbit" ;;
+        wan)       params="delay 40ms rate 30mbit" ;;
+        mobile)    params="delay 80ms 20ms distribution normal rate 10mbit loss 0.5%" ;;
+        lossy)     params="delay 40ms rate 30mbit loss 2%" ;;
+        *) echo "Unknown profile: {{profile}}. Available: lan, broadband, wan, mobile, lossy"; exit 1 ;;
     esac
     echo "Starting servers with network profile '{{profile}}': netem $params"
     NETEM_PARAMS="$params" docker compose up --build
+
+# List available network profiles and their netem parameters
+bench-net-list:
+    #!/usr/bin/env bash
+    echo "Available network profiles:"
+    echo "  lan        delay 0.5ms"
+    echo "  broadband  delay 10ms rate 100mbit"
+    echo "  wan        delay 40ms rate 30mbit"
+    echo "  mobile     delay 80ms 20ms distribution normal rate 10mbit loss 0.5%"
+    echo "  lossy      delay 40ms rate 30mbit loss 2%"
 
 # Lint the whole repo (Rust + TypeScript)
 lint:
