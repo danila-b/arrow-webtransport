@@ -1,4 +1,6 @@
 export interface QueryStats {
+  workloadId: string | null;
+  transportId: string | null;
   connectionSetupMs: number;
   ttfbMs: number | null;
   totalTimeMs: number;
@@ -24,6 +26,9 @@ export class StatsCollector {
   private _totalBytes = 0;
   private _totalRows = 0;
   private _restarts = 0;
+
+  private _workloadId: string | null = null;
+  private _transportId: string | null = null;
 
   private _longTaskCount = 0;
   private _longTaskTotalMs = 0;
@@ -71,6 +76,14 @@ export class StatsCollector {
     this._restarts++;
   }
 
+  setWorkloadId(id: string): void {
+    this._workloadId = id;
+  }
+
+  setTransportId(id: string): void {
+    this._transportId = id;
+  }
+
   startLongTaskObserver(): void {
     if (typeof PerformanceObserver === 'undefined') return;
 
@@ -110,6 +123,8 @@ export class StatsCollector {
     }
 
     return {
+      workloadId: this._workloadId,
+      transportId: this._transportId,
       connectionSetupMs,
       ttfbMs,
       totalTimeMs,

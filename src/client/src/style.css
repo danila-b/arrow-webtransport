@@ -62,6 +62,26 @@ body {
   gap: 0.3rem;
 }
 
+/* Workload picker */
+
+.workload-picker {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.workload-picker:focus {
+  outline: 2px solid #646cff;
+  border-color: transparent;
+}
+
 /* Query input */
 
 .query-input {
@@ -265,6 +285,11 @@ body {
   }
 
   .transport-picker {
+    border-color: #ccc;
+  }
+
+  .workload-picker {
+    background: #f9f9f9;
     border-color: #ccc;
   }
 

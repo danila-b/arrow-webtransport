@@ -175,6 +175,30 @@ describe('StatsCollector', () => {
     expect(stats.cancelLatencyMs).toBeNull();
   });
 
+  it('workloadId and transportId default to null', () => {
+    collector.markConnectStart();
+    collector.markConnectEnd();
+    collector.markQueryStart();
+    collector.markDone();
+
+    const stats = collector.snapshot();
+    expect(stats.workloadId).toBeNull();
+    expect(stats.transportId).toBeNull();
+  });
+
+  it('records workloadId and transportId when set', () => {
+    collector.setWorkloadId('medium');
+    collector.setTransportId('webtransport');
+    collector.markConnectStart();
+    collector.markConnectEnd();
+    collector.markQueryStart();
+    collector.markDone();
+
+    const stats = collector.snapshot();
+    expect(stats.workloadId).toBe('medium');
+    expect(stats.transportId).toBe('webtransport');
+  });
+
   it('long task counts default to zero in jsdom (no Long Task API)', () => {
     collector.startLongTaskObserver();
     collector.markConnectStart();

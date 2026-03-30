@@ -1,10 +1,12 @@
 import type { RecordBatch, Schema, Table } from 'apache-arrow';
 import type { QueryStats } from './stats.ts';
+import { CUSTOM_WORKLOAD_ID, WORKLOADS } from './workloads.ts';
 
 export type TransportId = 'webtransport' | 'http2-arrow' | 'http2-json';
 
 export interface AppElements {
   transportPicker: HTMLFieldSetElement;
+  workloadPicker: HTMLSelectElement;
   queryInput: HTMLTextAreaElement;
   runButton: HTMLButtonElement;
   cancelButton: HTMLButtonElement;
@@ -44,6 +46,22 @@ export function createAppLayout(root: HTMLElement): AppElements {
     if (opt.id === 'webtransport') radio.checked = true;
     label.append(radio, ` ${opt.label}`);
     transportPicker.appendChild(label);
+  }
+
+  const workloadPicker = document.createElement('select');
+  workloadPicker.className = 'workload-picker';
+
+  const customOption = document.createElement('option');
+  customOption.value = CUSTOM_WORKLOAD_ID;
+  customOption.textContent = 'Custom query';
+  workloadPicker.appendChild(customOption);
+
+  for (const w of WORKLOADS) {
+    const option = document.createElement('option');
+    option.value = w.id;
+    option.textContent = w.name;
+    option.title = w.description;
+    workloadPicker.appendChild(option);
   }
 
   const queryInput = document.createElement('textarea');
@@ -91,6 +109,7 @@ export function createAppLayout(root: HTMLElement): AppElements {
   root.append(
     heading,
     transportPicker,
+    workloadPicker,
     queryInput,
     buttonRow,
     progressContainer,
@@ -101,6 +120,7 @@ export function createAppLayout(root: HTMLElement): AppElements {
 
   return {
     transportPicker,
+    workloadPicker,
     queryInput,
     runButton,
     cancelButton,
@@ -115,6 +135,10 @@ export function createAppLayout(root: HTMLElement): AppElements {
 export function getSelectedTransport(picker: HTMLFieldSetElement): TransportId {
   const checked = picker.querySelector<HTMLInputElement>('input[name="transport"]:checked');
   return (checked?.value as TransportId) ?? 'webtransport';
+}
+
+export function getSelectedWorkload(picker: HTMLSelectElement): string {
+  return picker.value;
 }
 
 const DEFAULT_MAX_ROWS = 100;
@@ -273,6 +297,13 @@ function addStatRow(container: HTMLElement, label: string, value: string): void 
 
 export function renderStats(container: HTMLElement, stats: QueryStats): void {
   container.innerHTML = '';
+
+  if (stats.workloadId) {
+    addStatRow(container, 'Workload', stats.workloadId);
+  }
+  if (stats.transportId) {
+    addStatRow(container, 'Transport', stats.transportId);
+  }
 
   addStatRow(container, 'Connection setup', formatMs(stats.connectionSetupMs));
 

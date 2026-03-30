@@ -3,6 +3,7 @@ import {
   appendBatchRows,
   createAppLayout,
   getSelectedTransport,
+  getSelectedWorkload,
   hideProgressBar,
   initStreamingTable,
   renderStats,
@@ -15,12 +16,14 @@ import {
 } from './render.ts';
 import { StatsCollector } from './stats.ts';
 import { type TransportCallbacks, type TransportResult, createTransport } from './transport.ts';
+import { CUSTOM_WORKLOAD_ID, WORKLOADS } from './workloads.ts';
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app element');
 
 const {
   transportPicker,
+  workloadPicker,
   queryInput,
   runButton,
   cancelButton,
@@ -30,6 +33,17 @@ const {
   statsContainer,
   tableContainer,
 } = createAppLayout(root);
+
+workloadPicker.addEventListener('change', () => {
+  const workload = WORKLOADS.find((w) => w.id === workloadPicker.value);
+  if (workload) {
+    queryInput.value = workload.sql;
+  }
+});
+
+queryInput.addEventListener('input', () => {
+  workloadPicker.value = CUSTOM_WORKLOAD_ID;
+});
 
 runButton.addEventListener('click', async () => {
   runButton.disabled = true;
@@ -42,7 +56,12 @@ runButton.addEventListener('click', async () => {
   const collector = new StatsCollector();
   collector.startLongTaskObserver();
 
+  const workloadId = getSelectedWorkload(workloadPicker);
+  collector.setWorkloadId(workloadId);
+
   const transportId = getSelectedTransport(transportPicker);
+  collector.setTransportId(transportId);
+
   const transport = createTransport(transportId);
 
   let result: TransportResult | null = null;
