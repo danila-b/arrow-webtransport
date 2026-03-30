@@ -1,12 +1,15 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use futures::TryStreamExt;
 use server_core::datafusion::physical_plan::SendableRecordBatchStream;
 use server_core::datafusion::prelude::SessionContext;
 use server_core::encode::StreamEncoder;
+use tokio_util::sync::CancellationToken;
 use wtransport::Connection;
+
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
 struct EncodedChunk {
     data: Vec<u8>,
@@ -33,11 +36,35 @@ pub async fn handle_session(
         }
     };
 
-    stream_results(&connection, &mut send, record_stream).await?;
-    send.finish().await?;
+    let cancel_token = CancellationToken::new();
+    spawn_datagram_listener(connection.clone(), cancel_token.clone());
+
+    let cancelled = stream_results(&connection, &mut send, record_stream, &cancel_token).await?;
+
+    if !cancelled {
+        send.finish().await?;
+    }
 
     let _ = tokio::time::timeout(Duration::from_secs(5), connection.closed()).await;
     Ok(())
+}
+
+fn spawn_datagram_listener(connection: Connection, cancel_token: CancellationToken) {
+    tokio::spawn(async move {
+        loop {
+            match connection.receive_datagram().await {
+                Ok(dg) => {
+                    if is_cancel_payload(&dg.payload()) {
+                        println!("Cancel requested by client");
+                        let _ = connection.send_datagram(b"{\"type\":\"cancel_ack\"}");
+                        cancel_token.cancel();
+                        return;
+                    }
+                }
+                Err(_) => return,
+            }
+        }
+    });
 }
 
 async fn accept_connection(incoming: wtransport::endpoint::IncomingSession) -> Result<Connection> {
@@ -66,11 +93,15 @@ async fn execute_query(ctx: &SessionContext, query: &str) -> Result<SendableReco
     Ok(stream)
 }
 
+/// Stream Arrow IPC encoded batches over the WebTransport send stream.
+///
+/// Returns `true` if the query was cancelled by the client.
 async fn stream_results(
     connection: &Connection,
     send: &mut wtransport::SendStream,
     mut record_stream: SendableRecordBatchStream,
-) -> Result<()> {
+    cancel_token: &CancellationToken,
+) -> Result<bool> {
     let schema = record_stream.schema();
     let mut encoder = StreamEncoder::try_new(&schema)?;
     let header = encoder.drain();
@@ -122,52 +153,39 @@ async fn stream_results(
     let mut total_rows = 0usize;
     let mut total_bytes = 0usize;
     let mut cancelled = false;
+    let mut last_progress = Instant::now();
 
-    loop {
-        tokio::select! {
-            biased;
-            chunk = rx.recv() => {
-                match chunk {
-                    Some(first) => {
-                        let mut combined = first.data;
-                        let mut chunk_rows = first.rows;
-                        let mut chunk_batches =
-                            if first.rows > 0 { 1usize } else { 0 };
+    while let Some(first) = rx.recv().await {
+        let mut combined = first.data;
+        let mut chunk_rows = first.rows;
+        let mut chunk_batches = if first.rows > 0 { 1usize } else { 0 };
 
-                        while let Ok(more) = rx.try_recv() {
-                            combined.extend_from_slice(&more.data);
-                            chunk_rows += more.rows;
-                            if more.rows > 0 {
-                                chunk_batches += 1;
-                            }
-                        }
-
-                        send.write_all(&combined).await?;
-                        total_bytes += combined.len();
-                        batch_count += chunk_batches;
-                        total_rows += chunk_rows;
-
-                        if chunk_batches > 0 {
-                            send_progress(
-                                connection, total_rows, batch_count, total_bytes,
-                            );
-                        }
-                    }
-                    None => break,
-                }
-            }
-            datagram_result = connection.receive_datagram() => {
-                if let Ok(dg) = datagram_result {
-                    let payload = dg.payload();
-                    if is_cancel_payload(&payload) {
-                        println!("Cancel requested by client");
-                        let _ = connection.send_datagram(b"{\"type\":\"cancel_ack\"}");
-                        cancelled = true;
-                        break;
-                    }
-                }
+        while let Ok(more) = rx.try_recv() {
+            combined.extend_from_slice(&more.data);
+            chunk_rows += more.rows;
+            if more.rows > 0 {
+                chunk_batches += 1;
             }
         }
+
+        send.write_all(&combined).await?;
+        total_bytes += combined.len();
+        batch_count += chunk_batches;
+        total_rows += chunk_rows;
+
+        if chunk_batches > 0 && last_progress.elapsed() >= PROGRESS_INTERVAL {
+            send_progress(connection, total_rows, batch_count, total_bytes);
+            last_progress = Instant::now();
+        }
+
+        if cancel_token.is_cancelled() {
+            cancelled = true;
+            break;
+        }
+    }
+
+    if batch_count > 0 {
+        send_progress(connection, total_rows, batch_count, total_bytes);
     }
 
     if cancelled {
@@ -178,7 +196,7 @@ async fn stream_results(
         );
     }
 
-    Ok(())
+    Ok(cancelled)
 }
 
 fn send_progress(connection: &Connection, rows: usize, batches: usize, bytes: usize) {
