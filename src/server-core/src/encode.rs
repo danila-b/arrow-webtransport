@@ -9,23 +9,16 @@ use std::io::Write;
 /// IPC streaming: write schema → drain → write batch → drain → … → finish → drain.
 struct FlushableBuffer {
     inner: Vec<u8>,
-    /// Position up to which bytes have already been drained.
-    flushed: usize,
 }
 
 impl FlushableBuffer {
     fn new() -> Self {
-        Self {
-            inner: Vec::new(),
-            flushed: 0,
-        }
+        Self { inner: Vec::new() }
     }
 
     /// Take all bytes written since the last drain.
     fn drain(&mut self) -> Vec<u8> {
-        let bytes = self.inner[self.flushed..].to_vec();
-        self.flushed = self.inner.len();
-        bytes
+        std::mem::take(&mut self.inner)
     }
 }
 
