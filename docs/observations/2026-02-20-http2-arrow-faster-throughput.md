@@ -141,3 +141,34 @@ Applied items 1, 2, 3, and 5 together:
 Applied item 4 above. The HTTP/2 Arrow server now runs over TLS.
 
 **Result:** no significant downgrade in throughput for them, the gap still exists between WebTransport and HTTP/2 Arrow. JSON server is still slower than any of the other two.
+
+### Update 4: Remove channel+coalesce, inline the streaming loop
+
+Removed the mpsc channel, spawned encoding task, and `try_recv` coalescing loop
+introduced in Updates 1–2. Replaced with a direct inline loop: encode batch → write
+batch → next, with `tokio::select!` racing each `write_all` against the cancellation
+token. The QUIC window tuning from Update 2 is preserved.
+
+**Motivation:** The coalescing pattern (Update 2) introduced several problems that
+outweighed its benefits:
+
+- **Redundant memcpy** — `extend_from_slice` copied every coalesced chunk into a
+  combined buffer. For large results this was O(total_bytes) wasted work.
+- **Bursty writes** — the recv+try_recv drain created a pause→burst→pause cadence
+  that fights QUIC congestion control, especially under network emulation.
+- **Silent error swallowing** — the fire-and-forget encoding task dropped DataFusion
+  stream errors and encode errors, surfacing them as confusing client-side parse
+  failures rather than clear server errors.
+- **Cancel unresponsive** — cancel was only checked after `write_all` completed, so
+  a flow-control stall could delay cancellation indefinitely.
+
+The channel was originally added (Update 1) to pipeline encoding ahead of writes,
+mimicking the HTTP/2 server's `mpsc` → `Body::from_stream` pattern. But that pattern
+exists in HTTP/2 because axum requires returning a `Body` — the channel is an
+architectural boundary, not a performance optimization. WebTransport has no such
+constraint; the send stream is directly accessible.
+
+With the QUIC windows already tuned to 8 MB (Update 2), the original serial-write
+bottleneck is resolved. The inline loop is now structurally equivalent to what hyper
+does internally for HTTP/2: encode → write, with the transport stack managing its own
+buffering.

@@ -11,11 +11,6 @@ use wtransport::Connection;
 
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
-struct EncodedChunk {
-    data: Vec<u8>,
-    rows: usize,
-}
-
 pub async fn handle_session(
     incoming_session: wtransport::endpoint::IncomingSession,
     ctx: Arc<SessionContext>,
@@ -104,84 +99,47 @@ async fn stream_results(
 ) -> Result<bool> {
     let schema = record_stream.schema();
     let mut encoder = StreamEncoder::try_new(&schema)?;
+
     let header = encoder.drain();
-
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<EncodedChunk>(16);
-
-    tx.send(EncodedChunk {
-        data: header,
-        rows: 0,
-    })
-    .await
-    .map_err(|_| anyhow::anyhow!("channel closed"))?;
-
-    tokio::spawn(async move {
-        while let Some(batch) = record_stream.try_next().await.transpose() {
-            match batch {
-                Ok(batch) => {
-                    let rows = batch.num_rows();
-                    if let Err(e) = encoder.write_batch(&batch) {
-                        eprintln!("Encode error: {e}");
-                        break;
-                    }
-                    let chunk = encoder.drain();
-                    if tx.send(EncodedChunk { data: chunk, rows }).await.is_err() {
-                        return;
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Stream error: {e}");
-                    break;
-                }
-            }
-        }
-
-        if let Err(e) = encoder.finish() {
-            eprintln!("Finish error: {e}");
-            return;
-        }
-        let footer = encoder.drain();
-        let _ = tx
-            .send(EncodedChunk {
-                data: footer,
-                rows: 0,
-            })
-            .await;
-    });
+    send.write_all(&header).await?;
 
     let mut batch_count = 0usize;
     let mut total_rows = 0usize;
-    let mut total_bytes = 0usize;
+    let mut total_bytes = header.len();
     let mut cancelled = false;
     let mut last_progress = Instant::now();
 
-    while let Some(first) = rx.recv().await {
-        let mut combined = first.data;
-        let mut chunk_rows = first.rows;
-        let mut chunk_batches = if first.rows > 0 { 1usize } else { 0 };
+    while let Some(batch) = record_stream.try_next().await.transpose() {
+        let batch = batch?;
+        let rows = batch.num_rows();
 
-        while let Ok(more) = rx.try_recv() {
-            combined.extend_from_slice(&more.data);
-            chunk_rows += more.rows;
-            if more.rows > 0 {
-                chunk_batches += 1;
+        encoder.write_batch(&batch)?;
+        let chunk = encoder.drain();
+        let chunk_len = chunk.len();
+
+        tokio::select! {
+            result = send.write_all(&chunk) => result?,
+            _ = cancel_token.cancelled() => {
+                cancelled = true;
+                break;
             }
         }
 
-        send.write_all(&combined).await?;
-        total_bytes += combined.len();
-        batch_count += chunk_batches;
-        total_rows += chunk_rows;
+        batch_count += 1;
+        total_rows += rows;
+        total_bytes += chunk_len;
 
-        if chunk_batches > 0 && last_progress.elapsed() >= PROGRESS_INTERVAL {
+        if last_progress.elapsed() >= PROGRESS_INTERVAL {
             send_progress(connection, total_rows, batch_count, total_bytes);
             last_progress = Instant::now();
         }
+    }
 
-        if cancel_token.is_cancelled() {
-            cancelled = true;
-            break;
-        }
+    if !cancelled {
+        encoder.finish()?;
+        let footer = encoder.drain();
+        send.write_all(&footer).await?;
+        total_bytes += footer.len();
     }
 
     if batch_count > 0 {

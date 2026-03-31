@@ -27,6 +27,20 @@ The prototype is already suitable for manual comparison runs in Chrome. It is no
 - WebTransport progress updates over datagrams
 - Local TLS certificate generation with spec-compliant 14-day validity and race-free startup
 
+### Query workload suite (partial)
+
+Five preset analytical workloads are defined in `src/client/src/workloads.ts` and selectable via a dropdown in the client UI:
+
+| Workload | Rows | Intent |
+|----------|------|--------|
+| Small | 500 | 6 columns, latency-dominated |
+| Medium | 50k | 8 columns, filtered by trip distance |
+| Large | 500k | 5 columns, throughput-dominated |
+| Wide schema | 50k | `SELECT *`, full schema width |
+| Aggregation | varies | `GROUP BY` with counts/avgs/sums |
+
+Custom SQL is also supported via a free-text input. The stats panel tracks `workloadId` and `transportId` for each run. All queries currently target the single `yellow_taxi` dataset (NYC TLC Yellow Taxi Parquet files).
+
 ### Current measurements available in the client
 
 The client-side stats panel currently measures:
@@ -64,9 +78,9 @@ These are the metrics implemented today. Additional metrics for the thesis study
 
 The items below are the current roadmap. They describe the intended thesis-grade evaluation, not features that are already complete.
 
-### 1. Query workload suite
+### 1. ~~Query workload suite~~ (partially done)
 
-Define a shared set of analytical queries that vary by result size and schema shape, then expose them both in the benchmark workflow and in the client UI.
+Five preset workloads are implemented in the client with a UI picker. See "Implemented > Query workload suite" above for details. Remaining work is tracked under items 7 and 8 below.
 
 ### 2. Server-side timing instrumentation
 
@@ -88,7 +102,31 @@ Turn raw benchmark output into thesis-ready tables, charts, and statistical summ
 
 Explore stretch improvements such as richer query envelopes, multiple queries per WebTransport session, or richer control signaling.
 
+### 7. Expand query workload suite
+
+The current five presets all target a single dataset shape (NYC taxi trips). To strengthen the evaluation:
+
+- Add queries with varying selectivity (high-selectivity filters vs full scans)
+- Add queries that produce different column type mixes (timestamps, strings, nested types) to stress Arrow IPC encoding diversity
+- Add a "tiny" workload (single row or schema-only) to isolate pure protocol overhead
+- Consider a "cancellation" workload designed to be long-running so cancellation behavior can be studied under each transport
+
+### 8. Add TPC-H dataset and workloads
+
+Introduce TPC-H as a second, well-known analytical benchmark dataset to complement NYC taxi:
+
+- Use DataFusion's built-in TPC-H data generator (`datafusion-benchmarks` or `tpch` crate) or pre-generate Parquet files at a chosen scale factor (SF1 or SF10)
+- Register TPC-H tables in the shared query context alongside `yellow_taxi`
+- Add a subset of TPC-H queries (e.g. Q1, Q6, Q12, Q14) as preset workloads — chosen to cover different result sizes, join depths, and aggregation patterns
+- This provides a standardized, reproducible baseline that reviewers and readers will recognize
+
 ## Technical log
+
+### 2026-03-31
+
+- Replaced the WebTransport streaming pipeline in `session.rs`: removed the mpsc channel, spawned encoding task, and `try_recv` coalescing loop; replaced with a direct inline encode-write loop using `tokio::select!` for cancel-responsive writes. This eliminates redundant memcpy during coalescing, bursty write patterns, silent error swallowing from the fire-and-forget task, and cancel latency during flow-control stalls. The QUIC window tuning (8 MB send/stream, 16 MB connection) is preserved. See `docs/observations/2026-02-20-http2-arrow-faster-throughput.md` Update 4 for the full rationale.
+- Updated project tracker to reflect partial completion of the query workload suite: five preset workloads (small, medium, large, wide, aggregation) are implemented in the client with a UI picker and stats tracking.
+- Added planned work items for expanding the workload suite (selectivity variations, type diversity, protocol-overhead isolation) and for introducing TPC-H as a second benchmark dataset.
 
 ### 2026-03-28
 
