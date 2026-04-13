@@ -1,0 +1,7 @@
+mode,networkProfile,workloadId,queryCaseId,transportId,runCount,successCount,errorCount,cancelledCount,medianConnectionSetupMs,medianTtfbMs,medianTotalTimeMs,medianThroughputRowsPerSec,medianThroughputMBPerSec
+bench-net,lan,medium,medium,http2-arrow,3,3,0,0,0,210.59999999962747,1243.5999999996275,40205.853972350415,2.458057253136793
+bench-net,lan,medium,medium,http2-json,3,3,0,0,0,326.5,3238.7999999998137,15437.81647523863,2.981859470468432
+bench-net,lan,medium,medium,webtransport,3,3,0,0,173.1000000005588,50.40000000037253,1167.7000000001863,42819.21726470157,2.6173366446857176
+bench-net,lan,small,small,http2-arrow,3,3,0,0,0,176.29999999981374,232.19999999925494,2153.316106811388,0.1009130060296089
+bench-net,lan,small,small,http2-json,3,3,0,0,0.09999999962747097,263.79999999981374,327.5,1526.7175572519084,0.211593893129771
+bench-net,lan,small,small,webtransport,3,3,0,0,174.5,49,152.6000000005588,3276.539973775682,0.15355176933102357

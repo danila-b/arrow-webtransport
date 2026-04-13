@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-04-13T11:04:46.883Z",
+  "configPath": "/Users/danilabaklazhenko/study-repos/arrow-webtransport/src/client/benchmarks/minimal.example.json",
+  "gitSha": "787fb2ded0ec7c95c53b8f7c9518865757f6ec50",
+  "mode": "bench-net",
+  "networkProfile": "lan",
+  "baseUrl": "https://localhost:5173",
+  "browser": {
+    "name": "chromium",
+    "version": "147.0.7727.15"
+  },
+  "warmupRuns": 1,
+  "repetitions": 3,
+  "transports": [
+    "webtransport",
+    "http2-arrow",
+    "http2-json"
+  ],
+  "workloads": [
+    "small",
+    "medium"
+  ],
+  "customQueries": [],
+  "resultsFile": "results/2026-04-13T11-04-46-549Z/lan.ndjson",
+  "derivedFiles": {
+    "runsCsv": "results/2026-04-13T11-04-46-549Z/runs.csv",
+    "summaryCsv": "results/2026-04-13T11-04-46-549Z/summary.csv",
+    "reportMarkdown": "results/2026-04-13T11-04-46-549Z/report.md"
+  },
+  "totalPlannedRuns": 18,
+  "notes": [
+    "This runner persists raw browser-side results and session-level derived summaries.",
+    "Server startup and network-profile orchestration remain external prerequisites in v1."
+  ]
+}

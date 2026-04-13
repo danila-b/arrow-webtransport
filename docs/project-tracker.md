@@ -115,7 +115,16 @@ Remaining work is about deepening this harness rather than creating it from scra
 
 ### 5. Results analysis pipeline
 
-Turn raw benchmark output into thesis-ready tables, charts, and statistical summaries.
+A first session-level analysis pipeline now exists:
+
+- each benchmark session now derives `runs.csv`, `summary.csv`, and `report.md` alongside the raw NDJSON and manifest
+- the new outputs stay intentionally narrow: per-session only, human-readable, and sourced from the same browser-side metrics already shown in the client UI
+
+Remaining work is about deepening that pipeline into richer thesis outputs:
+
+- add percentiles, confidence intervals, and stronger statistical summaries
+- generate charts suitable for the thesis results chapter
+- support cross-session comparison once the experiment matrix grows
 
 ### 6. Protocol refinements
 

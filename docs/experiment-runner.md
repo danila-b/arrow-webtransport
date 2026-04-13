@@ -1,25 +1,26 @@
 # Experiment Runner
 
-This document describes the minimal automated experiment runner for the browser client.
+This document describes the automated experiment runner for the browser client.
 
 ## Goal
 
-The runner automates the existing browser UI, captures the same client-side stats path used for manual experiments, and persists one raw record per run.
+The runner automates the existing browser UI, captures the same client-side stats path used for manual experiments, persists one raw record per run, and then derives concise per-session summary artifacts from that raw output.
 
 Its job is intentionally narrow:
 
 - execute a configurable transport/workload matrix
 - repeat runs for future statistical analysis
 - write raw NDJSON artifacts plus a manifest
+- derive session-level CSV and Markdown summaries
 
 It does not yet:
 
 - orchestrate server startup
 - apply network profiles itself
 - add server-side timing instrumentation
-- compute aggregates, plots, or confidence intervals
+- compute plots, confidence intervals, or cross-session comparisons
 
-That boundary is deliberate. The first useful benchmark harness in this repository is the one that makes experiments repeatable without creating a second measurement system.
+That boundary is deliberate. The harness still measures only once through the browser-side `StatsCollector`; the derived artifacts simply reorganize that same structured payload into forms that are easier to inspect and compare.
 
 ## How It Works
 
@@ -96,6 +97,9 @@ Each session currently contains:
 
 - `<networkProfile>.ndjson`: one JSON object per persisted run
 - `manifest.json`: session metadata, config summary, and output location
+- `runs.csv`: one flattened row per persisted run
+- `summary.csv`: one summary row per `{transportId, queryCaseId}` pair in the session
+- `report.md`: a concise session report with metadata, status counts, median metrics, and caveats
 
 Each raw run record includes:
 
@@ -104,6 +108,12 @@ Each raw run record includes:
 - browser metadata
 - final run status: `success`, `error`, or `cancelled`
 - raw browser-side stats from `QueryStats`
+
+The derived files are built from those same persisted records:
+
+- `runs.csv` preserves per-run fidelity while making ad hoc inspection easier in spreadsheets or data tools
+- `summary.csv` keeps the first deliverable concise by reporting status counts and median values for the key latency and throughput metrics
+- `report.md` gives a quick human-readable session view without replacing the raw NDJSON as the source of truth
 
 ## Why The Browser Bridge Matters
 
@@ -114,11 +124,19 @@ That is important for two reasons:
 - it preserves the exact numeric payload already produced by `StatsCollector`
 - it keeps the automation layer resilient if the UI wording changes later
 
+## Session Analysis Notes
+
+The session analysis step intentionally stays narrow:
+
+- it summarizes persisted repetitions only; warmup runs are excluded
+- it uses browser-side metrics only; no new measurement path is introduced
+- it records `mode` and `networkProfile` labels but still does not verify the external environment itself
+
 ## Follow-Up Work
 
-Natural next steps after this v1 runner:
+Natural next steps after this session-level pipeline:
 
 - server-side timing and batch counters
 - richer query suites and TPC-H workloads
-- artifact summarization and chart generation
+- percentiles, confidence intervals, and chart generation
 - optional orchestration around `just dev` and `just bench-net`

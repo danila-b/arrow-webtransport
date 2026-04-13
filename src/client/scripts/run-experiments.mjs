@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { writeSessionAnalysis } from './session-analysis.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,9 +21,7 @@ function fail(message) {
 function parseArgs(argv) {
   const configArg = argv[2];
   if (!configArg) {
-    fail(
-      'Usage: npm run bench:run -- <config-path>\nExample: npm run bench:run -- benchmarks/minimal.example.json',
-    );
+    fail('Usage: npm run bench:run -- <config-path>\nExample: npm run bench:run -- benchmarks/minimal.example.json');
   }
 
   return {
@@ -230,6 +229,9 @@ async function main() {
   const sessionDir = path.join(outputRoot, timestampSlug);
   const ndjsonName = `${sanitizeFileName(config.networkProfile ?? 'default')}.ndjson`;
   const ndjsonPath = path.join(sessionDir, ndjsonName);
+  const runsCsvPath = path.join(sessionDir, 'runs.csv');
+  const summaryCsvPath = path.join(sessionDir, 'summary.csv');
+  const reportPath = path.join(sessionDir, 'report.md');
   const warmupRuns = Number(config.warmupRuns ?? 0);
   const repetitions = Number(config.repetitions ?? 1);
   const gitSha = getGitSha();
@@ -271,9 +273,14 @@ async function main() {
     workloads: config.workloads,
     customQueries: config.customQueries ?? [],
     resultsFile: path.relative(repoRoot, ndjsonPath),
+    derivedFiles: {
+      runsCsv: path.relative(repoRoot, runsCsvPath),
+      summaryCsv: path.relative(repoRoot, summaryCsvPath),
+      reportMarkdown: path.relative(repoRoot, reportPath),
+    },
     totalPlannedRuns: config.transports.length * queryCases.length * repetitions,
     notes: [
-      'This runner persists raw browser-side results only.',
+      'This runner persists raw browser-side results and session-level derived summaries.',
       'Server startup and network-profile orchestration remain external prerequisites in v1.',
     ],
   };
@@ -298,7 +305,12 @@ async function main() {
   await context.close();
   await browser.close();
 
+  const analysis = await writeSessionAnalysis({ repoRoot, sessionDir, manifest });
+
   console.log(`Wrote raw results to ${path.relative(repoRoot, ndjsonPath)}`);
+  console.log(`Wrote runs CSV to ${path.relative(repoRoot, analysis.runsCsvPath)}`);
+  console.log(`Wrote summary CSV to ${path.relative(repoRoot, analysis.summaryCsvPath)}`);
+  console.log(`Wrote report to ${path.relative(repoRoot, analysis.reportPath)}`);
 }
 
 await main();
