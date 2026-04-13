@@ -8,7 +8,7 @@ This repository contains a thesis prototype for comparing three ways to deliver 
 
 The server side is built in Rust with DataFusion. The browser client is a single TypeScript app that can switch between all three transports and render results through the same UI.
 
-For deeper project context, see `docs/project-tracker.md` for current status, `docs/thesis-one-pager.md` for the concise thesis summary, and `docs/thesis-research.md` for the research-oriented outline.
+For deeper project context, see `docs/project-tracker.md` for current status, `docs/thesis-one-pager.md` for the concise thesis summary, `docs/thesis-research.md` for the research-oriented outline, and `docs/experiment-runner.md` for the minimal automation workflow.
 
 ## Clone
 
@@ -107,6 +107,22 @@ just bench-net-list
 ```
 
 Container startup logs print the applied `tc netem` string so you can confirm which profile is active.
+
+## Automated experiment runner
+
+The repository now includes a minimal browser-driven experiment runner that automates the existing client and persists raw run data for later analysis.
+
+The runner intentionally keeps startup separate from measurement:
+
+1. Start the environment yourself with either `just dev` or `just bench-net <profile>` plus `just client`
+2. Run the browser automation from `src/client`
+
+```sh
+cd src/client
+npm run bench:run -- benchmarks/minimal.example.json
+```
+
+Artifacts are written under `results/<timestamp>/` as NDJSON plus a manifest. See `docs/experiment-runner.md` for the config format, output layout, and current scope boundary.
 
 ## Notes
 

@@ -12,7 +12,7 @@ The repository currently contains a working prototype for comparing three browse
 - `src/server-core/`: shared query execution, Arrow encoding, and certificate support
 - `src/client/`: one browser client with a transport picker and shared rendering/stats pipeline
 
-The prototype is already suitable for manual comparison runs in Chrome. It is not yet a full experiment harness.
+The prototype is now suitable for both manual comparison runs in Chrome and minimal automated browser-driven experiment runs. It is not yet a full thesis-grade experiment harness.
 
 ## Implemented
 
@@ -58,6 +58,17 @@ The client-side stats panel currently measures:
 
 These are the metrics implemented today. Additional metrics for the thesis study may be added later.
 
+### Minimal automated experiment runner
+
+The repository now includes a minimal benchmark harness for repeated browser-driven runs:
+
+- Chromium automation via Playwright that drives the existing client UI
+- Configurable transport/workload/repetition matrix execution
+- Raw artifact persistence as NDJSON plus a per-session manifest under `results/<timestamp>/`
+- A machine-readable `window.__bench` bridge sourced from the same `StatsCollector.snapshot()` payload that powers the stats panel
+
+This is intentionally a thin automation layer around the real browser path, not a second benchmark implementation. It improves repeatability and result capture, but it does not yet orchestrate the environment, expand the thesis metrics set, or add server-side observability. See `docs/experiment-runner.md` for the concrete workflow and scope boundary.
+
 ### Research baseline
 
 - Clear comparison target: WebTransport vs HTTP/2 Arrow vs HTTP/2 JSON
@@ -68,9 +79,11 @@ These are the metrics implemented today. Additional metrics for the thesis study
 ## Current limitations and open risks
 
 - WebTransport support is effectively Chromium-only for this prototype
-- The benchmark workflow is still mostly manual; there is no automated experiment runner yet
+- The automated runner is intentionally minimal; it still depends on the user to start the correct environment (`just dev` or `just bench-net <profile>` plus `just client`)
 - Network emulation shapes server egress only; symmetric RTT modeling would require an IFB or router-sidecar topology
 - Some thesis metrics are still target-study metrics rather than implemented instrumentation
+- The experiment matrix is still narrow relative to the final thesis design; the current runner primarily automates the existing workload set and client metrics
+- Raw result capture exists, but there is not yet a built-in analysis pipeline for statistical summaries, charts, or significance testing
 - Backpressure and QUIC flow-control behavior under slower clients still need more systematic testing
 - The JSON baseline is intentionally non-streaming, so it is useful for comparison but not feature-parity
 
@@ -90,9 +103,15 @@ Add server-side timing, batch counts, and byte counters so client-side observati
 
 Five named profiles are now available via `just bench-net <profile>`: `lan`, `broadband`, `wan`, `mobile`, and `lossy`. See README for the full parameter table.
 
-### 4. Automated experiment runner
+### 4. ~~Automated experiment runner~~ (minimal v1 done)
 
-Create a repeatable benchmark harness that drives the client automatically, executes the full experiment matrix, and writes results to machine-readable output.
+A minimal runner now exists:
+
+- it automates the browser client with Playwright
+- executes configurable repeated runs across transports and workloads
+- persists raw NDJSON records plus a manifest
+
+Remaining work is about deepening this harness rather than creating it from scratch. That follow-up work is tracked under items 5, 7, 8, and 9 below.
 
 ### 5. Results analysis pipeline
 
@@ -120,7 +139,26 @@ Introduce TPC-H as a second, well-known analytical benchmark dataset to compleme
 - Add a subset of TPC-H queries (e.g. Q1, Q6, Q12, Q14) as preset workloads — chosen to cover different result sizes, join depths, and aggregation patterns
 - This provides a standardized, reproducible baseline that reviewers and readers will recognize
 
+### 9. Deepen the experiment harness
+
+The minimal runner solves repeatability and raw artifact capture, but several follow-ups remain to make it thesis-grade:
+
+- Define and implement the final metrics set for the study, including any missing browser-side metrics such as time to first decoded batch, and make the raw output schema explicit and stable
+- Expand the experiment matrix beyond the current presets: more workload shapes, more selectivity variation, cancellation-focused runs, and eventually broader dataset coverage
+- Add server-side observability and statistics so browser-observed timings can be cross-checked against execution, encoding, and transport behavior
+- Add environment metadata and guardrails so runs record more of the experimental context (browser version, git SHA, startup mode, network profile, and eventually machine/environment notes)
+- Add analysis helpers that turn raw NDJSON into summary tables, percentiles, and plots without making the runner itself responsible for interpretation
+- Consider thin orchestration around startup and teardown once the measurement model is stable, but keep that secondary to measurement quality
+
 ## Technical log
+
+### 2026-04-13
+
+- Implemented a minimal automated experiment runner for the browser client.
+  - Added a machine-readable `window.__bench` bridge in the client so automation can read final run state and the exact `StatsCollector.snapshot()` payload without scraping formatted DOM text.
+  - Added a Playwright-based runner script in `src/client` that drives Chromium against the existing UI, executes configurable transport/workload/repetition matrices, and writes raw NDJSON plus a manifest under `results/<timestamp>/`.
+  - Added documentation for the runner workflow and its v1 boundary: startup remains an external prerequisite, while server-side instrumentation and analysis stay as follow-up work.
+- Updated project status to reflect that automation now exists in minimal form. The remaining benchmark work is now primarily about metric definition, experiment-matrix expansion, server-side observability, and downstream analysis.
 
 ### 2026-03-31
 
