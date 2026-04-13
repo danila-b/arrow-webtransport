@@ -8,6 +8,15 @@
   "warmupRuns": 1,
   "repetitions": 3,
   "transports": ["webtransport", "http2-arrow", "http2-json"],
-  "workloads": ["taxi_8c_0100k", "taxi_19c_0050k"],
+  "workloads": [
+    "taxi_8c_0100k",
+    "taxi_8c_0200k",
+    "taxi_8c_0400k",
+    "taxi_8c_0800k",
+    "taxi_19c_0050k",
+    "taxi_19c_0100k",
+    "taxi_19c_0200k",
+    "taxi_19c_0400k"
+  ],
   "customQueries": []
 }

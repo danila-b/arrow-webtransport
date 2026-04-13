@@ -29,17 +29,15 @@ The prototype is now suitable for both manual comparison runs in Chrome and mini
 
 ### Query workload suite (partial)
 
-Five preset analytical workloads are defined in `src/client/src/workloads.ts` and selectable via a dropdown in the client UI:
+The client now defines a clearer taxi-focused transport-comparison matrix in `src/client/src/workloads.ts`:
 
-| Workload | Rows | Intent |
-|----------|------|--------|
-| Small | 500 | 6 columns, latency-dominated |
-| Medium | 50k | 8 columns, filtered by trip distance |
-| Large | 500k | 5 columns, throughput-dominated |
-| Wide schema | 50k | `SELECT *`, full schema width |
-| Aggregation | varies | `GROUP BY` with counts/avgs/sums |
+| Workload family | Rows | Intent |
+|---------------|------|--------|
+| Taxi 10 cols | 100k, 250k, 500k, 1M | narrow-schema row-scaling ladder |
+| Taxi all 19 cols | 50k, 100k, 250k, 500k | wide-schema row-scaling ladder |
+| Aggregation | varies | `GROUP BY` with counts/avgs/sums for exploratory/manual runs |
 
-Custom SQL is also supported via a free-text input. The stats panel tracks `workloadId` and `transportId` for each run. All queries currently target the single `yellow_taxi` dataset (NYC TLC Yellow Taxi Parquet files).
+Custom SQL is also supported via a free-text input. The stats panel tracks `workloadId` and `transportId` for each run. The automated runner now also persists a stable `queryCaseId`, a human-readable `queryCaseLabel`, and structured profile metadata such as dataset, family, column count, and row count. All current presets target the single `yellow_taxi` dataset (NYC TLC Yellow Taxi Parquet files).
 
 ### Current measurements available in the client
 
@@ -82,7 +80,7 @@ This is intentionally a thin automation layer around the real browser path, not 
 - The automated runner is intentionally minimal; it still depends on the user to start the correct environment (`just dev` or `just bench-net <profile>` plus `just client`)
 - Network emulation shapes server egress only; symmetric RTT modeling would require an IFB or router-sidecar topology
 - Some thesis metrics are still target-study metrics rather than implemented instrumentation
-- The experiment matrix is still narrow relative to the final thesis design; the current runner primarily automates the existing workload set and client metrics
+- The experiment matrix is still narrow relative to the final thesis design; the current runner now automates a controlled taxi row-scaling suite plus the existing client metrics
 - Raw result capture exists, but there is not yet a built-in analysis pipeline for statistical summaries, charts, or significance testing
 - Backpressure and QUIC flow-control behavior under slower clients still need more systematic testing
 - The JSON baseline is intentionally non-streaming, so it is useful for comparison but not feature-parity
@@ -93,7 +91,7 @@ The items below are the current roadmap. They describe the intended thesis-grade
 
 ### 1. ~~Query workload suite~~ (partially done)
 
-Five preset workloads are implemented in the client with a UI picker. See "Implemented > Query workload suite" above for details. Remaining work is tracked under items 7 and 8 below.
+The client now has a structured taxi row-scaling matrix with explicit profile names plus an aggregation preset. See "Implemented > Query workload suite" above for details. Remaining work is tracked under items 7 and 8 below.
 
 ### 2. Server-side timing instrumentation
 
@@ -132,7 +130,7 @@ Explore stretch improvements such as richer query envelopes, multiple queries pe
 
 ### 7. Expand query workload suite
 
-The current five presets all target a single dataset shape (NYC taxi trips). To strengthen the evaluation:
+The current default automated suite is now better controlled, but it still targets a single dataset shape (NYC taxi trips). To strengthen the evaluation:
 
 - Add queries with varying selectivity (high-selectivity filters vs full scans)
 - Add queries that produce different column type mixes (timestamps, strings, nested types) to stress Arrow IPC encoding diversity
@@ -167,12 +165,16 @@ The minimal runner solves repeatability and raw artifact capture, but several fo
   - Added a machine-readable `window.__bench` bridge in the client so automation can read final run state and the exact `StatsCollector.snapshot()` payload without scraping formatted DOM text.
   - Added a Playwright-based runner script in `src/client` that drives Chromium against the existing UI, executes configurable transport/workload/repetition matrices, and writes raw NDJSON plus a manifest under `results/<timestamp>/`.
   - Added documentation for the runner workflow and its v1 boundary: startup remains an external prerequisite, while server-side instrumentation and analysis stay as follow-up work.
+- Refreshed the taxi benchmark profiles to use explicit row-scaling names instead of vague size labels.
+  - Replaced the old `small`/`medium`/`large`/`wide` presets with two controlled profile families: 10-column narrow scans and full-schema wide scans.
+  - Added structured query profile metadata to persisted benchmark artifacts so `runs.csv`, `summary.csv`, and `report.md` can stay readable while remaining machine-friendly for later thesis analysis.
+  - Split the benchmark examples into a small smoke config and a full taxi scaling matrix config.
 - Updated project status to reflect that automation now exists in minimal form. The remaining benchmark work is now primarily about metric definition, experiment-matrix expansion, server-side observability, and downstream analysis.
 
 ### 2026-03-31
 
 - Replaced the WebTransport streaming pipeline in `session.rs`: removed the mpsc channel, spawned encoding task, and `try_recv` coalescing loop; replaced with a direct inline encode-write loop using `tokio::select!` for cancel-responsive writes. This eliminates redundant memcpy during coalescing, bursty write patterns, silent error swallowing from the fire-and-forget task, and cancel latency during flow-control stalls. The QUIC window tuning (8 MB send/stream, 16 MB connection) is preserved. See `docs/observations/2026-02-20-http2-arrow-faster-throughput.md` Update 4 for the full rationale.
-- Updated project tracker to reflect partial completion of the query workload suite: five preset workloads (small, medium, large, wide, aggregation) are implemented in the client with a UI picker and stats tracking.
+- Updated project tracker to reflect partial completion of the query workload suite at the time: five preset workloads (small, medium, large, wide, aggregation) were implemented in the client with a UI picker and stats tracking.
 - Added planned work items for expanding the workload suite (selectivity variations, type diversity, protocol-overhead isolation) and for introducing TPC-H as a second benchmark dataset.
 
 ### 2026-03-28

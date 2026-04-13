@@ -187,7 +187,7 @@ describe('StatsCollector', () => {
   });
 
   it('records workloadId and transportId when set', () => {
-    collector.setWorkloadId('medium');
+    collector.setWorkloadId('taxi_8c_0200k');
     collector.setTransportId('webtransport');
     collector.markConnectStart();
     collector.markConnectEnd();
@@ -195,7 +195,7 @@ describe('StatsCollector', () => {
     collector.markDone();
 
     const stats = collector.snapshot();
-    expect(stats.workloadId).toBe('medium');
+    expect(stats.workloadId).toBe('taxi_8c_0200k');
     expect(stats.transportId).toBe('webtransport');
   });
 

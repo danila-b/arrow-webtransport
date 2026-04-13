@@ -66,10 +66,12 @@ Some of the primary metrics are already visible in the prototype today. The full
 The evaluation crosses three dimensions:
 
 - **3 transports**: WebTransport, HTTP/2 Arrow, HTTP/2 JSON
-- **5 query workloads**: small, medium, large, wide-schema, and aggregation-oriented workloads
+- **8 default automated query profiles**: taxi 8-column profiles at `100k`, `200k`, `400k`, and `800k` rows, plus full-schema taxi profiles at `50k`, `100k`, `200k`, and `400k` rows
 - **5 target network profiles**: LAN, broadband, WAN, mobile, and lossy links
 
 Each configuration is repeated 20+ times for statistical significance. Results are reported with medians, percentiles, and confidence intervals.
+
+Aggregation and custom SQL workloads remain useful for exploratory/manual runs, but the default automated matrix now emphasizes controlled row-scaling so transport comparisons are easier to interpret.
 
 ### Research expectations
 

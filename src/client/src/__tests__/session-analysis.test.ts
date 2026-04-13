@@ -2,17 +2,59 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+// @ts-expect-error The session analysis script is authored as plain ESM and exercised through runtime tests here.
 import { buildSessionArtifacts, buildSummaryRows, writeSessionAnalysis } from '../../scripts/session-analysis.mjs';
+
+const PRIMARY_QUERY_CASE_ID = 'taxi_8c_0100k';
+const PRIMARY_QUERY_CASE_LABEL = 'Taxi 8 cols x 100k rows';
+
+type ProfileFamily = 'narrow' | 'wide' | 'aggregation';
+
+interface RecordStatsOverrides {
+  workloadId?: string;
+  transportId?: string;
+  connectionSetupMs?: number;
+  ttfbMs?: number | null;
+  totalTimeMs?: number;
+  totalRows?: number;
+  totalBytes?: number;
+  connectionRestarts?: number;
+  throughputRowsPerSec?: number | null;
+  throughputMBPerSec?: number | null;
+  cancelLatencyMs?: number | null;
+  longTaskCount?: number;
+  longTaskTotalMs?: number;
+}
+
+interface MakeRecordOptions {
+  transportId?: string;
+  workloadId?: string;
+  queryCaseId?: string;
+  queryCaseLabel?: string;
+  datasetId?: string;
+  profileFamily?: ProfileFamily;
+  columnCount?: number;
+  rowCount?: number | null;
+  repetition?: number;
+  result?: 'success' | 'error' | 'cancelled';
+  errorMessage?: string | null;
+  stats?: RecordStatsOverrides | null;
+}
 
 function makeRecord({
   transportId = 'webtransport',
-  workloadId = 'small',
-  queryCaseId = 'small',
+  workloadId = PRIMARY_QUERY_CASE_ID,
+  queryCaseId = PRIMARY_QUERY_CASE_ID,
+  queryCaseLabel = PRIMARY_QUERY_CASE_LABEL,
+  datasetId = 'yellow_taxi',
+  profileFamily = 'narrow',
+  columnCount = 8,
+  rowCount = 100_000,
   repetition = 1,
   result = 'success',
   errorMessage = null,
   stats = {},
-} = {}) {
+}: MakeRecordOptions = {}) {
   return {
     schemaVersion: 1,
     runId: `${transportId}-${queryCaseId}-${repetition}`,
@@ -29,6 +71,11 @@ function makeRecord({
     transportId,
     workloadId,
     queryCaseId,
+    queryCaseLabel,
+    datasetId,
+    profileFamily,
+    columnCount,
+    rowCount,
     querySource: workloadId,
     result,
     errorMessage,
@@ -70,7 +117,7 @@ function makeManifest(tmpRoot: string) {
     warmupRuns: 1,
     repetitions: 2,
     transports: ['webtransport', 'http2-json'],
-    workloads: ['small'],
+    workloads: [PRIMARY_QUERY_CASE_ID],
     customQueries: [],
     resultsFile: 'results/2026-04-13T12-00-00-000Z/lan.ndjson',
     derivedFiles: {
@@ -128,7 +175,12 @@ describe('buildSummaryRows', () => {
 
     expect(rows).toHaveLength(2);
     expect(rows[1]).toMatchObject({
-      queryCaseId: 'small',
+      queryCaseId: PRIMARY_QUERY_CASE_ID,
+      queryCaseLabel: PRIMARY_QUERY_CASE_LABEL,
+      datasetId: 'yellow_taxi',
+      profileFamily: 'narrow',
+      columnCount: 8,
+      rowCount: 100_000,
       transportId: 'webtransport',
       runCount: 3,
       successCount: 2,
@@ -140,6 +192,34 @@ describe('buildSummaryRows', () => {
       medianThroughputRowsPerSec: 10_000,
       medianThroughputMBPerSec: 10,
     });
+  });
+
+  it('sorts query cases by structured profile metadata before transport id', () => {
+    const rows = buildSummaryRows([
+      makeRecord({
+        queryCaseId: 'taxi_19c_0400k',
+        queryCaseLabel: 'Taxi all 19 cols x 400k rows',
+        workloadId: 'taxi_19c_0400k',
+        profileFamily: 'wide',
+        columnCount: 19,
+        rowCount: 400_000,
+      }),
+      makeRecord({
+        queryCaseId: 'aggregation',
+        queryCaseLabel: 'Aggregation',
+        workloadId: 'aggregation',
+        profileFamily: 'aggregation',
+        columnCount: 5,
+        rowCount: null,
+      }),
+      makeRecord(),
+    ]);
+
+    expect(rows.map((row: { queryCaseId: string }) => row.queryCaseId)).toEqual([
+      PRIMARY_QUERY_CASE_ID,
+      'taxi_19c_0400k',
+      'aggregation',
+    ]);
   });
 });
 
@@ -161,11 +241,14 @@ describe('buildSessionArtifacts', () => {
     });
 
     expect(artifacts.runsCsv).toContain('schemaVersion,runId,recordedAt');
+    expect(artifacts.runsCsv).toContain('queryCaseLabel,datasetId,profileFamily,columnCount,rowCount');
     expect(artifacts.runsCsv).toContain('cancelLatencyMs');
+    expect(artifacts.summaryCsv).toContain('queryCaseLabel,datasetId,profileFamily,columnCount,rowCount');
     expect(artifacts.summaryCsv).toContain('medianTotalTimeMs');
     expect(artifacts.reportMarkdown).toContain('# Benchmark Session Report');
     expect(artifacts.reportMarkdown).toContain('## Outcome Summary');
     expect(artifacts.reportMarkdown).toContain('## Caveats');
+    expect(artifacts.reportMarkdown).toContain(PRIMARY_QUERY_CASE_LABEL);
     expect(artifacts.reportMarkdown).toContain('No error message recorded.');
   });
 });
@@ -199,6 +282,9 @@ describe('writeSessionAnalysis', () => {
     expect(result.recordCount).toBe(2);
     expect(result.summaryRowCount).toBe(1);
     await expect(fs.readFile(path.join(sessionDir, 'runs.csv'), 'utf8')).resolves.toContain('network lost');
+    await expect(fs.readFile(path.join(sessionDir, 'summary.csv'), 'utf8')).resolves.toContain(
+      PRIMARY_QUERY_CASE_LABEL,
+    );
     await expect(fs.readFile(path.join(sessionDir, 'summary.csv'), 'utf8')).resolves.toContain('medianTotalTimeMs');
     await expect(fs.readFile(path.join(sessionDir, 'report.md'), 'utf8')).resolves.toContain('## Exceptions');
   });

@@ -61,6 +61,12 @@ export function createAppLayout(root: HTMLElement): AppElements {
     option.value = w.id;
     option.textContent = w.name;
     option.title = w.description;
+    option.dataset.datasetId = w.datasetId;
+    option.dataset.profileFamily = w.profileFamily;
+    option.dataset.columnCount = String(w.columnCount);
+    if (w.rowCount !== null) {
+      option.dataset.rowCount = String(w.rowCount);
+    }
     workloadPicker.appendChild(option);
   }
 

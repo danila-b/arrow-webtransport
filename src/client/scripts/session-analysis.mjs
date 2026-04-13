@@ -15,6 +15,11 @@ export const RUNS_CSV_COLUMNS = [
   'transportId',
   'workloadId',
   'queryCaseId',
+  'queryCaseLabel',
+  'datasetId',
+  'profileFamily',
+  'columnCount',
+  'rowCount',
   'querySource',
   'result',
   'errorMessage',
@@ -38,6 +43,11 @@ export const SUMMARY_CSV_COLUMNS = [
   'networkProfile',
   'workloadId',
   'queryCaseId',
+  'queryCaseLabel',
+  'datasetId',
+  'profileFamily',
+  'columnCount',
+  'rowCount',
   'transportId',
   'runCount',
   'successCount',
@@ -57,6 +67,12 @@ const SUMMARY_METRICS = [
   ['throughputRowsPerSec', 'medianThroughputRowsPerSec'],
   ['throughputMBPerSec', 'medianThroughputMBPerSec'],
 ];
+
+const PROFILE_FAMILY_SORT_ORDER = {
+  narrow: 0,
+  wide: 1,
+  aggregation: 2,
+};
 
 function csvEscape(value) {
   if (value === null || value === undefined) {
@@ -122,6 +138,11 @@ export function flattenRunRecord(record) {
     transportId: record.transportId,
     workloadId: record.workloadId,
     queryCaseId: record.queryCaseId,
+    queryCaseLabel: record.queryCaseLabel ?? null,
+    datasetId: record.datasetId ?? null,
+    profileFamily: record.profileFamily ?? null,
+    columnCount: record.columnCount ?? null,
+    rowCount: record.rowCount ?? null,
     querySource: record.querySource,
     result: record.result,
     errorMessage: record.errorMessage,
@@ -145,8 +166,72 @@ function makeSummaryKey(record) {
   return `${record.queryCaseId}::${record.transportId}`;
 }
 
+function compareNullableString(left, right) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (left === null || left === undefined) {
+    return 1;
+  }
+
+  if (right === null || right === undefined) {
+    return -1;
+  }
+
+  return left.localeCompare(right);
+}
+
+function compareNullableNumber(left, right) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (left === null || left === undefined) {
+    return 1;
+  }
+
+  if (right === null || right === undefined) {
+    return -1;
+  }
+
+  return left - right;
+}
+
+function compareProfileFamily(left, right) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (left === null || left === undefined) {
+    return 1;
+  }
+
+  if (right === null || right === undefined) {
+    return -1;
+  }
+
+  return (PROFILE_FAMILY_SORT_ORDER[left] ?? Number.MAX_SAFE_INTEGER) -
+    (PROFILE_FAMILY_SORT_ORDER[right] ?? Number.MAX_SAFE_INTEGER);
+}
+
+function compareQueryCase(left, right) {
+  return (
+    compareNullableString(left.datasetId, right.datasetId) ||
+    compareProfileFamily(left.profileFamily, right.profileFamily) ||
+    compareNullableNumber(left.rowCount, right.rowCount) ||
+    compareNullableNumber(left.columnCount, right.columnCount) ||
+    compareNullableString(left.queryCaseLabel, right.queryCaseLabel) ||
+    left.queryCaseId.localeCompare(right.queryCaseId)
+  );
+}
+
 function compareSummaryRows(left, right) {
-  return left.queryCaseId.localeCompare(right.queryCaseId) || left.transportId.localeCompare(right.transportId);
+  return compareQueryCase(left, right) || left.transportId.localeCompare(right.transportId);
+}
+
+function getQueryCaseDisplay(record) {
+  return record.queryCaseLabel ?? record.queryCaseId;
 }
 
 export function buildSummaryRows(records) {
@@ -171,6 +256,11 @@ export function buildSummaryRows(records) {
       networkProfile: first.networkProfile,
       workloadId: first.workloadId,
       queryCaseId: first.queryCaseId,
+      queryCaseLabel: first.queryCaseLabel ?? null,
+      datasetId: first.datasetId ?? null,
+      profileFamily: first.profileFamily ?? null,
+      columnCount: first.columnCount ?? null,
+      rowCount: first.rowCount ?? null,
       transportId: first.transportId,
       runCount: groupRecords.length,
       successCount,
@@ -210,7 +300,7 @@ function renderMarkdownTable(columns, rows) {
 
 function buildOutcomeRows(summaryRows) {
   return summaryRows.map((row) => ({
-    queryCaseId: row.queryCaseId,
+    queryCase: getQueryCaseDisplay(row),
     transportId: row.transportId,
     persistedRuns: String(row.runCount),
     successRate: `${row.successCount}/${row.runCount}`,
@@ -221,7 +311,7 @@ function buildOutcomeRows(summaryRows) {
 
 function buildPerformanceRows(summaryRows) {
   return summaryRows.map((row) => ({
-    queryCaseId: row.queryCaseId,
+    queryCase: getQueryCaseDisplay(row),
     transportId: row.transportId,
     connectMs: formatMetric(row.medianConnectionSetupMs),
     ttfbMs: formatMetric(row.medianTtfbMs),
@@ -236,13 +326,13 @@ function buildExceptionRows(records) {
     .filter((record) => record.result !== 'success')
     .toSorted((left, right) => {
       return (
-        left.queryCaseId.localeCompare(right.queryCaseId) ||
+        compareQueryCase(left, right) ||
         left.transportId.localeCompare(right.transportId) ||
         left.repetition - right.repetition
       );
     })
     .map((record) => ({
-      queryCaseId: record.queryCaseId,
+      queryCase: getQueryCaseDisplay(record),
       transportId: record.transportId,
       repetition: String(record.repetition),
       result: record.result,
@@ -292,7 +382,7 @@ export function buildReportMarkdown({ manifest, records, summaryRows }) {
     '',
     renderMarkdownTable(
       [
-        { key: 'queryCaseId', label: 'Query case' },
+        { key: 'queryCase', label: 'Query profile' },
         { key: 'transportId', label: 'Transport' },
         { key: 'persistedRuns', label: 'Persisted runs' },
         { key: 'successRate', label: 'Successes' },
@@ -306,7 +396,7 @@ export function buildReportMarkdown({ manifest, records, summaryRows }) {
     '',
     renderMarkdownTable(
       [
-        { key: 'queryCaseId', label: 'Query case' },
+        { key: 'queryCase', label: 'Query profile' },
         { key: 'transportId', label: 'Transport' },
         { key: 'connectMs', label: 'Connect (ms)' },
         { key: 'ttfbMs', label: 'TTFB (ms)' },
@@ -327,7 +417,7 @@ export function buildReportMarkdown({ manifest, records, summaryRows }) {
     lines.push(
       renderMarkdownTable(
         [
-          { key: 'queryCaseId', label: 'Query case' },
+          { key: 'queryCase', label: 'Query profile' },
           { key: 'transportId', label: 'Transport' },
           { key: 'repetition', label: 'Repetition' },
           { key: 'result', label: 'Result' },

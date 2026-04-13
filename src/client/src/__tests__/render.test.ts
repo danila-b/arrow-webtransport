@@ -16,6 +16,7 @@ import {
   updateRowCount,
 } from '../render.ts';
 import type { QueryStats } from '../stats.ts';
+import { WORKLOADS } from '../workloads.ts';
 
 function makeTestTable(rowCount: number) {
   const ids = Int32Array.from({ length: rowCount }, (_, i) => i + 1);
@@ -87,6 +88,18 @@ describe('createAppLayout', () => {
     const radios = els.transportPicker.querySelectorAll<HTMLInputElement>('input[type="radio"]');
     expect(radios).toHaveLength(3);
     expect(getSelectedTransport(els.transportPicker)).toBe('webtransport');
+  });
+
+  it('stores workload profile metadata on preset options', () => {
+    const els = createAppLayout(root);
+    const option = els.workloadPicker.querySelector<HTMLOptionElement>('option[value="taxi_8c_0100k"]');
+
+    expect(option).not.toBeNull();
+    expect(option?.dataset.datasetId).toBe('yellow_taxi');
+    expect(option?.dataset.profileFamily).toBe('narrow');
+    expect(option?.dataset.columnCount).toBe('8');
+    expect(option?.dataset.rowCount).toBe('100000');
+    expect(els.workloadPicker.querySelectorAll('option')).toHaveLength(WORKLOADS.length + 1);
   });
 });
 

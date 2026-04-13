@@ -66,7 +66,7 @@ Example:
   "warmupRuns": 1,
   "repetitions": 3,
   "transports": ["webtransport", "http2-arrow", "http2-json"],
-  "workloads": ["small", "medium"],
+  "workloads": ["taxi_8c_0100k", "taxi_19c_0050k"],
   "customQueries": []
 }
 ```
@@ -84,6 +84,52 @@ Fields:
 - `transports`: transport ids from the client UI
 - `workloads`: preset workload ids from `src/client/src/workloads.ts`
 - `customQueries`: optional list of `{ "id": "...", "sql": "..." }` entries
+
+## Default Automated Matrix
+
+The benchmark presets now use explicit payload-oriented names instead of vague labels such as `small` or `medium`.
+
+The default taxi scaling suite is split into two profile families:
+
+- narrow: 8 projected columns at `100k`, `200k`, `400k`, and `800k` rows
+- wide: all 19 taxi columns at `50k`, `100k`, `200k`, and `400k` rows
+
+That keeps the automated runner focused on transport behavior without pushing the default network-emulated cases quite as hard:
+
+- within one family, row count changes while schema width stays fixed
+- across the two families, schema width changes while row-count ladders stay comparable
+- the narrow family avoids string-heavy skew so one variable-width field does not dominate payload size
+
+The default narrow projection is:
+
+- `VendorID`
+- `tpep_pickup_datetime`
+- `tpep_dropoff_datetime`
+- `passenger_count`
+- `trip_distance`
+- `PULocationID`
+- `DOLocationID`
+- `total_amount`
+
+These are approximate per-row payload notes rather than byte-exact Arrow accounting, because the runtime schema comes from the Parquet files:
+
+| Column | Logical type | Approx per-row payload | Why include it |
+| --- | --- | --- | --- |
+| `VendorID` | small integer/code | about 4 bytes, fixed-width | keeps one provider/category code in the narrow profile |
+| `tpep_pickup_datetime` | timestamp | about 8 bytes, fixed-width | captures trip start timing without variable-width text |
+| `tpep_dropoff_datetime` | timestamp | about 8 bytes, fixed-width | preserves trip duration semantics with another fixed-width field |
+| `passenger_count` | small integer | about 4-8 bytes, fixed-width | representative low-cardinality count field |
+| `trip_distance` | floating-point measure | about 8 bytes, fixed-width | captures a core continuous trip metric |
+| `PULocationID` | integer/code | about 4 bytes, fixed-width | keeps pickup geography as a compact zone code |
+| `DOLocationID` | integer/code | about 4 bytes, fixed-width | keeps dropoff geography as a compact zone code |
+| `total_amount` | monetary numeric | about 8 bytes, fixed-width | keeps one business-relevant outcome measure without carrying the full fare breakdown |
+
+The repository includes two example configs:
+
+- `src/client/benchmarks/minimal.example.json`: lightweight smoke matrix with one narrow and one wide baseline profile
+- `src/client/benchmarks/taxi-scaling.example.json`: full 8-profile taxi scaling matrix for repeated experiments
+
+Aggregation and custom SQL remain available in the UI and runner config, but they are no longer part of the default automated transport-comparison suite.
 
 ## Output
 
@@ -104,16 +150,16 @@ Each session currently contains:
 Each raw run record includes:
 
 - reproducibility metadata such as timestamp, git SHA, mode, and network profile
-- experiment inputs such as transport, query case id, repetition, and query text
+- experiment inputs such as transport, query case id, query case label, profile metadata, repetition, and query text
 - browser metadata
 - final run status: `success`, `error`, or `cancelled`
 - raw browser-side stats from `QueryStats`
 
 The derived files are built from those same persisted records:
 
-- `runs.csv` preserves per-run fidelity while making ad hoc inspection easier in spreadsheets or data tools
-- `summary.csv` keeps the first deliverable concise by reporting status counts and median values for the key latency and throughput metrics
-- `report.md` gives a quick human-readable session view without replacing the raw NDJSON as the source of truth
+- `runs.csv` preserves per-run fidelity while also exposing machine-friendly profile metadata such as dataset, family, column count, and row count
+- `summary.csv` keeps the first deliverable concise by reporting one row per `{transportId, queryCaseId}` pair together with median values for the key latency and throughput metrics
+- `report.md` now prefers the human-readable query profile label while the CSV outputs retain the stable machine ids
 
 ## Why The Browser Bridge Matters
 

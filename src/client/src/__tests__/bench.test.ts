@@ -1,15 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  initBenchBridge,
-  publishBenchRunComplete,
-  publishBenchRunStart,
-  type BenchBridge,
-} from '../bench.ts';
+import { type BenchBridge, initBenchBridge, publishBenchRunComplete, publishBenchRunStart } from '../bench.ts';
 import type { QueryStats } from '../stats.ts';
+
+const PRIMARY_WORKLOAD_ID = 'taxi_8c_0100k';
+const SECONDARY_WORKLOAD_ID = 'taxi_19c_0050k';
 
 function makeStats(overrides: Partial<QueryStats> = {}): QueryStats {
   return {
-    workloadId: 'small',
+    workloadId: PRIMARY_WORKLOAD_ID,
     transportId: 'webtransport',
     connectionSetupMs: 10,
     ttfbMs: 5,
@@ -28,7 +26,7 @@ function makeStats(overrides: Partial<QueryStats> = {}): QueryStats {
 
 describe('bench bridge', () => {
   beforeEach(() => {
-    delete (window as Window & { __bench?: BenchBridge }).__bench;
+    (window as Window & { __bench?: BenchBridge }).__bench = undefined;
     initBenchBridge();
   });
 
@@ -41,7 +39,7 @@ describe('bench bridge', () => {
 
   it('publishes run start state and increments the run id', () => {
     const runId = publishBenchRunStart({
-      workloadId: 'medium',
+      workloadId: SECONDARY_WORKLOAD_ID,
       transportId: 'http2-arrow',
       queryText: 'SELECT 1',
     });
@@ -50,7 +48,7 @@ describe('bench bridge', () => {
     expect(window.__bench?.lastRun).toMatchObject({
       runId: 1,
       status: 'running',
-      workloadId: 'medium',
+      workloadId: SECONDARY_WORKLOAD_ID,
       transportId: 'http2-arrow',
       queryText: 'SELECT 1',
       stats: null,
@@ -61,24 +59,24 @@ describe('bench bridge', () => {
 
   it('publishes run completion with stats payload', () => {
     const runId = publishBenchRunStart({
-      workloadId: 'small',
+      workloadId: PRIMARY_WORKLOAD_ID,
       transportId: 'webtransport',
-      queryText: 'SELECT * FROM yellow_taxi LIMIT 500',
+      queryText: 'SELECT * FROM yellow_taxi LIMIT 100000',
     });
 
     publishBenchRunComplete({
       runId,
       status: 'success',
-      workloadId: 'small',
+      workloadId: PRIMARY_WORKLOAD_ID,
       transportId: 'webtransport',
-      queryText: 'SELECT * FROM yellow_taxi LIMIT 500',
+      queryText: 'SELECT * FROM yellow_taxi LIMIT 100000',
       stats: makeStats(),
     });
 
     expect(window.__bench?.lastRun).toMatchObject({
       runId: 1,
       status: 'success',
-      workloadId: 'small',
+      workloadId: PRIMARY_WORKLOAD_ID,
       transportId: 'webtransport',
       stats: makeStats(),
       errorMessage: null,
@@ -96,7 +94,7 @@ describe('bench bridge', () => {
     window.addEventListener('bench:run-state', listener);
 
     const runId = publishBenchRunStart({
-      workloadId: 'small',
+      workloadId: PRIMARY_WORKLOAD_ID,
       transportId: 'webtransport',
       queryText: 'SELECT 1',
     });
@@ -104,7 +102,7 @@ describe('bench bridge', () => {
     publishBenchRunComplete({
       runId,
       status: 'error',
-      workloadId: 'small',
+      workloadId: PRIMARY_WORKLOAD_ID,
       transportId: 'webtransport',
       queryText: 'SELECT 1',
       stats: makeStats(),

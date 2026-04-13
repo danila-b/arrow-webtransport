@@ -1,10 +1,5 @@
 import './style.css';
-import {
-  type BenchRunStatus,
-  initBenchBridge,
-  publishBenchRunComplete,
-  publishBenchRunStart,
-} from './bench.ts';
+import { type BenchRunStatus, initBenchBridge, publishBenchRunComplete, publishBenchRunStart } from './bench.ts';
 import {
   appendBatchRows,
   createAppLayout,
@@ -22,7 +17,7 @@ import {
 } from './render.ts';
 import { StatsCollector } from './stats.ts';
 import { type TransportCallbacks, type TransportResult, createTransport } from './transport.ts';
-import { CUSTOM_WORKLOAD_ID, WORKLOADS } from './workloads.ts';
+import { CUSTOM_WORKLOAD_ID, getWorkloadById } from './workloads.ts';
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app element');
@@ -43,7 +38,7 @@ const {
 initBenchBridge();
 
 workloadPicker.addEventListener('change', () => {
-  const workload = WORKLOADS.find((w) => w.id === workloadPicker.value);
+  const workload = getWorkloadById(workloadPicker.value);
   if (workload) {
     queryInput.value = workload.sql;
   }

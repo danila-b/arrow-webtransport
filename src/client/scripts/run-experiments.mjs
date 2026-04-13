@@ -13,6 +13,25 @@ const repoRoot = path.resolve(clientDir, '..', '..');
 const defaultBaseUrl = 'https://localhost:5173';
 const defaultRunTimeoutMs = 300_000;
 
+function parseOptionalNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeQueryCaseMetadata(metadata) {
+  return {
+    queryCaseLabel: metadata?.queryCaseLabel ?? null,
+    datasetId: metadata?.datasetId ?? null,
+    profileFamily: metadata?.profileFamily ?? null,
+    columnCount: parseOptionalNumber(metadata?.columnCount),
+    rowCount: parseOptionalNumber(metadata?.rowCount),
+  };
+}
+
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -91,11 +110,13 @@ function createRunRecord({
   queryText,
   repetition,
   transportId,
+  queryCaseMetadata,
   result,
   errorMessage,
   stats,
 }) {
   const workloadId = queryCase.kind === 'preset' ? queryCase.id : 'custom';
+  const metadata = normalizeQueryCaseMetadata(queryCaseMetadata);
 
   return {
     schemaVersion: 1,
@@ -113,6 +134,11 @@ function createRunRecord({
     transportId,
     workloadId,
     queryCaseId: queryCase.id,
+    queryCaseLabel: metadata.queryCaseLabel,
+    datasetId: metadata.datasetId,
+    profileFamily: metadata.profileFamily,
+    columnCount: metadata.columnCount,
+    rowCount: metadata.rowCount,
     querySource: workloadId,
     queryText,
     result,
@@ -132,12 +158,34 @@ async function waitForBenchBridge(page) {
 async function prepareQuery(page, queryCase) {
   if (queryCase.kind === 'preset') {
     await page.selectOption('.workload-picker', queryCase.id);
+    const queryCaseMetadata = await page.locator('.workload-picker').evaluate((picker) => {
+      const selectedOption = picker.selectedOptions.item(0);
+      if (!selectedOption) {
+        return null;
+      }
+
+      return {
+        queryCaseLabel: selectedOption.textContent?.trim() ?? null,
+        datasetId: selectedOption.dataset.datasetId ?? null,
+        profileFamily: selectedOption.dataset.profileFamily ?? null,
+        columnCount: selectedOption.dataset.columnCount ?? null,
+        rowCount: selectedOption.dataset.rowCount ?? null,
+      };
+    });
+
+    return {
+      queryText: await page.locator('.query-input').inputValue(),
+      queryCaseMetadata,
+    };
   } else {
     await page.selectOption('.workload-picker', 'custom');
     await page.fill('.query-input', queryCase.sql);
-  }
 
-  return page.locator('.query-input').inputValue();
+    return {
+      queryText: await page.locator('.query-input').inputValue(),
+      queryCaseMetadata: null,
+    };
+  }
 }
 
 async function executeClientRun(page, { transportId, queryCase, runTimeoutMs, baseUrl }) {
@@ -145,7 +193,7 @@ async function executeClientRun(page, { transportId, queryCase, runTimeoutMs, ba
   await waitForBenchBridge(page);
 
   await page.check(`input[name="transport"][value="${transportId}"]`);
-  const queryText = await prepareQuery(page, queryCase);
+  const { queryText, queryCaseMetadata } = await prepareQuery(page, queryCase);
 
   const previousRunId = await page.evaluate(() => window.__bench?.lastRun.runId ?? 0);
   await page.click('.btn-run');
@@ -176,6 +224,7 @@ async function executeClientRun(page, { transportId, queryCase, runTimeoutMs, ba
   const state = await completionHandle.jsonValue();
   return {
     queryText,
+    queryCaseMetadata,
     state,
   };
 }
@@ -185,7 +234,7 @@ async function runSingleCase(page, browserVersion, config, gitSha, queryCase, tr
   const runTimeoutMs = config.runTimeoutMs ?? defaultRunTimeoutMs;
 
   try {
-    const { queryText, state } = await executeClientRun(page, {
+    const { queryText, queryCaseMetadata, state } = await executeClientRun(page, {
       transportId,
       queryCase,
       runTimeoutMs,
@@ -200,6 +249,7 @@ async function runSingleCase(page, browserVersion, config, gitSha, queryCase, tr
       queryText,
       repetition,
       transportId,
+      queryCaseMetadata,
       result: state.status,
       errorMessage: state.errorMessage,
       stats: state.stats,
@@ -213,6 +263,7 @@ async function runSingleCase(page, browserVersion, config, gitSha, queryCase, tr
       queryText: queryCase.kind === 'custom' ? queryCase.sql : null,
       repetition,
       transportId,
+      queryCaseMetadata: null,
       result: 'error',
       errorMessage: error instanceof Error ? error.message : String(error),
       stats: null,
