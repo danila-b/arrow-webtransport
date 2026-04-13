@@ -386,6 +386,8 @@ describe('showStatsPanel / resetStatsPanel', () => {
 
 function makeFullStats(overrides: Partial<QueryStats> = {}): QueryStats {
   return {
+    workloadId: null,
+    transportId: null,
     connectionSetupMs: 42,
     ttfbMs: 18,
     totalTimeMs: 1200,

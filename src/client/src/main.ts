@@ -1,5 +1,11 @@
 import './style.css';
 import {
+  type BenchRunStatus,
+  initBenchBridge,
+  publishBenchRunComplete,
+  publishBenchRunStart,
+} from './bench.ts';
+import {
   appendBatchRows,
   createAppLayout,
   getSelectedTransport,
@@ -34,6 +40,8 @@ const {
   tableContainer,
 } = createAppLayout(root);
 
+initBenchBridge();
+
 workloadPicker.addEventListener('change', () => {
   const workload = WORKLOADS.find((w) => w.id === workloadPicker.value);
   if (workload) {
@@ -62,13 +70,22 @@ runButton.addEventListener('click', async () => {
   const transportId = getSelectedTransport(transportPicker);
   collector.setTransportId(transportId);
 
+  const query = queryInput.value;
+  const runId = publishBenchRunStart({
+    workloadId,
+    transportId,
+    queryText: query,
+  });
+
   const transport = createTransport(transportId);
 
   let result: TransportResult | null = null;
+  let cancelRequested = false;
+  let finalStatus: BenchRunStatus = 'error';
+  let errorMessage: string | null = null;
 
   try {
     const MAX_DISPLAY_ROWS = 1000;
-    const query = queryInput.value;
     let totalRows = 0;
     let displayedRows = 0;
     let columnNames: string[] | null = null;
@@ -100,6 +117,7 @@ runButton.addEventListener('click', async () => {
     };
 
     cancelButton.onclick = async () => {
+      cancelRequested = true;
       collector.markCancelRequested();
       setStatus(statusEl, 'Cancelling...', 'info');
       try {
@@ -141,15 +159,32 @@ runButton.addEventListener('click', async () => {
     }
 
     collector.markDone();
-    setStatus(statusEl, `Done — ${totalRows} rows received`, 'success');
+    finalStatus = cancelRequested ? 'cancelled' : 'success';
+    if (cancelRequested) {
+      setStatus(statusEl, `Cancelled — ${totalRows} rows received`, 'info');
+    } else {
+      setStatus(statusEl, `Done — ${totalRows} rows received`, 'success');
+    }
   } catch (err) {
     collector.markDone();
     const message = err instanceof Error ? err.message : String(err);
+    finalStatus = cancelRequested || (err instanceof DOMException && err.name === 'AbortError') ? 'cancelled' : 'error';
+    errorMessage = finalStatus === 'error' ? message : null;
     setStatus(statusEl, message, 'error');
   } finally {
     transport.close();
     collector.stopLongTaskObserver();
-    renderStats(statsContainer, collector.snapshot());
+    const stats = collector.snapshot();
+    renderStats(statsContainer, stats);
+    publishBenchRunComplete({
+      runId,
+      status: finalStatus,
+      workloadId,
+      transportId,
+      queryText: query,
+      stats,
+      errorMessage,
+    });
     runButton.disabled = false;
     cancelButton.hidden = true;
     cancelButton.onclick = null;
