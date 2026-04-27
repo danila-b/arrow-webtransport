@@ -84,6 +84,9 @@ This is intentionally a thin automation layer around the real browser path, not 
 - Raw result capture exists, but there is not yet a built-in analysis pipeline for statistical summaries, charts, or significance testing
 - Backpressure and QUIC flow-control behavior under slower clients still need more systematic testing
 - The JSON baseline is intentionally non-streaming, so it is useful for comparison but not feature-parity
+- HTTP baselines currently run through the Vite proxy in the browser client; final thesis runs should verify or remove that proxy path so the measured protocol is unambiguous
+- Some client-side metric names are still broader than their thesis definitions, especially throughput and cancellation latency
+- Failed connection attempts can still produce misleading timing artifacts, so failed-run metric handling needs tightening before final analysis
 
 ## Planned work
 
@@ -150,12 +153,31 @@ Introduce TPC-H as a second, well-known analytical benchmark dataset to compleme
 
 The minimal runner solves repeatability and raw artifact capture, but several follow-ups remain to make it thesis-grade:
 
+- Record actual browser transport/protocol metadata for HTTP baselines, not only the selected UI transport id
+- Add guardrails for failed runs so invalid timings are null or excluded from median summaries
 - Define and implement the final metrics set for the study, including any missing browser-side metrics such as time to first decoded batch, and make the raw output schema explicit and stable
 - Expand the experiment matrix beyond the current presets: more workload shapes, more selectivity variation, cancellation-focused runs, and eventually broader dataset coverage
 - Add server-side observability and statistics so browser-observed timings can be cross-checked against execution, encoding, and transport behavior
 - Add environment metadata and guardrails so runs record more of the experimental context (browser version, git SHA, startup mode, network profile, and eventually machine/environment notes)
 - Add analysis helpers that turn raw NDJSON into summary tables, percentiles, and plots without making the runner itself responsible for interpretation
 - Consider thin orchestration around startup and teardown once the measurement model is stable, but keep that secondary to measurement quality
+
+### 10. Verify HTTP baseline path
+
+Resolve the Vite proxy measurement ambiguity before final thesis runs:
+
+- either make the browser client call the Rust HTTP/2 servers directly, or explicitly verify and record the actual negotiated protocol for proxied HTTP baseline requests
+- document the chosen path so HTTP/2 Arrow and HTTP/2 JSON results are not confused with development-proxy behavior
+
+### 11. Implementation review follow-ups
+
+Recent code review highlighted a few concise improvement candidates:
+
+- Make HTTP Arrow stream errors explicit instead of only logging them from the spawned streaming task
+- Split end-to-end throughput from transfer-window throughput so execution/rendering cost is not confused with network delivery
+- Add time to first decoded batch and time to first rendered row for the progressive-rendering claim
+- Capture server-side cancellation milestones: cancel observed, stream stopped, and final bytes sent
+- Prefer success-only statistical summaries, with failed and cancelled runs reported separately
 
 ## Technical log
 
