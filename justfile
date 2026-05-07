@@ -79,3 +79,15 @@ lint:
     cargo fmt
     cargo clippy
     cd src/client && npm run lint:fix
+
+# Remove Rust target dir, client node_modules/npm cache, and Docker images/containers built for this project
+clean:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    echo "==> cargo clean"
+    cargo clean
+    echo "==> removing src/client/node_modules and cleaning npm cache"
+    rm -rf src/client/node_modules
+    (cd src/client && npm cache clean --force) || true
+    echo "==> tearing down docker compose stack (images, volumes, orphans)"
+    docker compose down --rmi local --volumes --remove-orphans || true
