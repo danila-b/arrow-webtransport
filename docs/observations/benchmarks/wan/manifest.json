@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-05-10T11:52:43.115Z",
+  "configPath": "/Users/danilabaklazhenko/study-repos/arrow-webtransport/src/client/benchmarks/taxi-scaling.example.json",
+  "gitSha": "e7a06e3519a7df1f781a7ef68e8350a79633f229",
+  "mode": "bench-net",
+  "networkProfile": "lan",
+  "baseUrl": "https://localhost:5173",
+  "browser": {
+    "name": "chromium",
+    "version": "147.0.7727.15"
+  },
+  "warmupRuns": 1,
+  "repetitions": 3,
+  "transports": [
+    "webtransport",
+    "http2-arrow",
+    "http2-json"
+  ],
+  "workloads": [
+    "taxi_8c_0100k",
+    "taxi_8c_0200k",
+    "taxi_8c_0400k",
+    "taxi_8c_0800k",
+    "taxi_19c_0050k",
+    "taxi_19c_0100k",
+    "taxi_19c_0200k",
+    "taxi_19c_0400k"
+  ],
+  "customQueries": [],
+  "resultsFile": "results/2026-05-10T11-52-42-975Z/lan.ndjson",
+  "derivedFiles": {
+    "runsCsv": "results/2026-05-10T11-52-42-975Z/runs.csv",
+    "summaryCsv": "results/2026-05-10T11-52-42-975Z/summary.csv",
+    "reportMarkdown": "results/2026-05-10T11-52-42-975Z/report.md"
+  },
+  "totalPlannedRuns": 72,
+  "notes": [
+    "This runner persists raw browser-side results and session-level derived summaries.",
+    "Server startup and network-profile orchestration remain external prerequisites in v1."
+  ]
+}

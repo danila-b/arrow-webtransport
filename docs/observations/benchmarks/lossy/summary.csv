@@ -1,0 +1,25 @@
+mode,networkProfile,workloadId,queryCaseId,queryCaseLabel,datasetId,profileFamily,columnCount,rowCount,transportId,runCount,successCount,errorCount,cancelledCount,medianConnectionSetupMs,medianTtfbMs,medianTotalTimeMs,medianThroughputRowsPerSec,medianThroughputMBPerSec
+bench-net,lan,taxi_8c_0100k,taxi_8c_0100k,Taxi 8 cols x 100k rows,yellow_taxi,narrow,8,100000,http2-arrow,3,3,0,0,0,261.19999999925494,17517.5,5708.577137148566,0.30299163693449416
+bench-net,lan,taxi_8c_0100k,taxi_8c_0100k,Taxi 8 cols x 100k rows,yellow_taxi,narrow,8,100000,http2-json,3,3,0,0,0,412.19999999925494,75617.90000000037,1322.4382057687333,0.24465983583251993
+bench-net,lan,taxi_8c_0100k,taxi_8c_0100k,Taxi 8 cols x 100k rows,yellow_taxi,narrow,8,100000,webtransport,3,3,0,0,164.90000000037253,53.79999999888241,6908.9000000003725,14474.084152324482,0.7682345959558995
+bench-net,lan,taxi_8c_0200k,taxi_8c_0200k,Taxi 8 cols x 200k rows,yellow_taxi,narrow,8,200000,http2-arrow,3,3,0,0,0,217.69999999925494,46628.90000000037,4289.18546223476,0.2276193519469667
+bench-net,lan,taxi_8c_0200k,taxi_8c_0200k,Taxi 8 cols x 200k rows,yellow_taxi,narrow,8,200000,http2-json,3,3,0,0,0,400.19999999925494,147983.09999999963,1351.5056786889888,0.2500455389838441
+bench-net,lan,taxi_8c_0200k,taxi_8c_0200k,Taxi 8 cols x 200k rows,yellow_taxi,narrow,8,200000,webtransport,3,3,0,0,155.80000000074506,68.40000000037253,11193.200000001118,17867.99128041847,0.9482221348675034
+bench-net,lan,taxi_8c_0400k,taxi_8c_0400k,Taxi 8 cols x 400k rows,yellow_taxi,narrow,8,400000,http2-arrow,3,3,0,0,0,251.2000000011176,93994.30000000075,4255.577199894003,0.22582348078553519
+bench-net,lan,taxi_8c_0400k,taxi_8c_0400k,Taxi 8 cols x 400k rows,yellow_taxi,narrow,8,400000,webtransport,3,3,0,0,140.90000000037253,53.40000000037253,41855.90000000037,9556.59775563293,0.5071237268819881
+bench-net,lan,taxi_8c_0800k,taxi_8c_0800k,Taxi 8 cols x 800k rows,yellow_taxi,narrow,8,800000,http2-arrow,3,3,0,0,0,220.2999999988824,190920.59999999963,4190.22357985467,0.22235207725096234
+bench-net,lan,taxi_8c_0800k,taxi_8c_0800k,Taxi 8 cols x 800k rows,yellow_taxi,narrow,8,800000,webtransport,3,3,0,0,164.59999999962747,58.90000000037253,75174.59999999963,10641.892341296181,0.5647065897257879
+bench-net,lan,taxi_19c_0050k,taxi_19c_0050k,Taxi all 19 cols x 50k rows,yellow_taxi,wide,19,50000,http2-arrow,3,3,0,0,0,209.80000000074506,30989.900000000373,1613.4288913484522,0.23001068089925797
+bench-net,lan,taxi_19c_0050k,taxi_19c_0050k,Taxi all 19 cols x 50k rows,yellow_taxi,wide,19,50000,http2-json,3,3,0,0,0,315,75704.30000000075,660.4644650303815,0.20596774555738376
+bench-net,lan,taxi_19c_0050k,taxi_19c_0050k,Taxi all 19 cols x 50k rows,yellow_taxi,wide,19,50000,webtransport,3,3,0,0,208.2999999988824,47.70000000111759,11563.300000000745,4324.025148529986,0.6164337170184585
+bench-net,lan,taxi_19c_0100k,taxi_19c_0100k,Taxi all 19 cols x 100k rows,yellow_taxi,wide,19,100000,http2-arrow,3,3,0,0,0,245.40000000037253,66341.69999999925,1507.3475657090657,0.21485286026737574
+bench-net,lan,taxi_19c_0100k,taxi_19c_0100k,Taxi all 19 cols x 100k rows,yellow_taxi,wide,19,100000,http2-json,3,3,0,0,0,444.8999999985099,141993.19999999925,704.2590771952496,0.2196092277658378
+bench-net,lan,taxi_19c_0100k,taxi_19c_0100k,Taxi all 19 cols x 100k rows,yellow_taxi,wide,19,100000,webtransport,3,3,0,0,188.90000000037253,45.5,22349.300000000745,4474.413068865542,0.6377695945734105
+bench-net,lan,taxi_19c_0200k,taxi_19c_0200k,Taxi all 19 cols x 200k rows,yellow_taxi,wide,19,200000,http2-arrow,3,1,2,0,0.049999999813735485,417.59999999962747,80537.79999999981,1319.781675778843,0.20106116090939813
+bench-net,lan,taxi_19c_0200k,taxi_19c_0200k,Taxi all 19 cols x 200k rows,yellow_taxi,wide,19,200000,http2-json,3,3,0,0,0,445.5999999977648,262252.80000000075,762.6229348170905,0.23781385746882333
+bench-net,lan,taxi_19c_0200k,taxi_19c_0200k,Taxi all 19 cols x 200k rows,yellow_taxi,wide,19,200000,webtransport,3,3,0,0,180.40000000037253,64.19999999925494,57306.59999999963,3489.9994067001235,0.49802361333598894
+bench-net,lan,taxi_19c_0400k,taxi_19c_0400k,Taxi all 19 cols x 400k rows,yellow_taxi,wide,19,400000,webtransport,3,3,0,0,189.40000000037253,62.5,115917,3450.744929561669,0.49339144387794714
+bench-net,lan,taxi_19c_0400k,taxi_19c_0400k,,,,,,http2-arrow,3,0,3,0,,,,,
+bench-net,lan,taxi_19c_0400k,taxi_19c_0400k,,,,,,http2-json,3,0,3,0,,,,,
+bench-net,lan,taxi_8c_0400k,taxi_8c_0400k,,,,,,http2-json,3,0,3,0,,,,,
+bench-net,lan,taxi_8c_0800k,taxi_8c_0800k,,,,,,http2-json,3,0,3,0,,,,,
